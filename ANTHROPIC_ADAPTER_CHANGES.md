@@ -7,7 +7,7 @@
 
 ## Summary
 
-The `AnthropicCompatibleProvider` adapter has been substantially upgraded to correctly translate the full OpenAI Chat Completions request/response surface into Anthropic's Messages API format. Previously the adapter dropped tool definitions, tool results, and image content entirely, which would have caused silent failures for any OpenBulma agent workflow that relies on function calling or multimodal input when routed through an Anthropic-backed provider.
+The `AnthropicCompatibleProvider` adapter has been substantially upgraded to correctly translate the full OpenAI Chat Completions request/response surface into Anthropic's Messages API format. Previously the adapter dropped tool definitions, tool results, and image content entirely, which would have caused silent failures for any Agent Bridge agent workflow that relies on function calling or multimodal input when routed through an Anthropic-backed provider.
 
 ---
 
@@ -134,9 +134,9 @@ The initial `role: "assistant"` chunk in streaming responses now includes `"cont
 
 ---
 
-## Impact on OpenBulma v4
+## Impact on Agent Bridge v4
 
-OpenBulma agents that use Anthropic-backed models (via `anthropic/`, `kimi-coding/`, or `minimax-portal/` routes) for function-calling workflows will now work correctly end-to-end:
+Agent Bridge agents that use Anthropic-backed models (via `anthropic/`, `kimi-coding/`, or `minimax-portal/` routes) for function-calling workflows will now work correctly end-to-end:
 
 - Tool schemas are delivered to the model.
 - Tool invocations in the assistant turn are preserved in conversation history.

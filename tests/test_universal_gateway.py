@@ -22,7 +22,7 @@ from open_llm_auth.config import (
 )
 from open_llm_auth.main import app
 from open_llm_auth.auth import manager as manager_module
-from open_llm_auth.providers import OpenBulmaProvider
+from open_llm_auth.providers import AgentBridgeProvider
 from open_llm_auth.server import auth as auth_module
 from open_llm_auth.server import config_routes as config_routes_module
 from open_llm_auth.server.durable_state import reset_durable_state_store_cache
@@ -221,7 +221,7 @@ def test_universal_task_lifecycle_routes(monkeypatch: pytest.MonkeyPatch) -> Non
     _patch_config(monkeypatch, Config(server_token="server-secret"))
     calls: dict[str, object] = {}
 
-    provider = OpenBulmaProvider(provider_id="openbulma", base_url="http://127.0.0.1:1")
+    provider = AgentBridgeProvider(provider_id="agent_bridge", base_url="http://127.0.0.1:1")
 
     async def _run_task(task_input):
         calls["run_task"] = task_input
@@ -256,7 +256,7 @@ def test_universal_task_lifecycle_routes(monkeypatch: pytest.MonkeyPatch) -> Non
     resolved = SimpleNamespace(
         provider=provider,
         providers=[provider],
-        provider_id="openbulma",
+        provider_id="agent_bridge",
         model_id="assistant",
         profile_id=None,
         auth_source="provider-config:no-auth-header",
@@ -273,7 +273,7 @@ def test_universal_task_lifecycle_routes(monkeypatch: pytest.MonkeyPatch) -> Non
         "/v1/universal/tasks",
         headers=_auth_header(),
         json={
-            "provider": "openbulma",
+            "provider": "agent_bridge",
             "task": {"objective": "fix tests"},
         },
     )
@@ -285,7 +285,7 @@ def test_universal_task_lifecycle_routes(monkeypatch: pytest.MonkeyPatch) -> Non
         "/v1/universal/tasks/task-1/approve",
         headers=_auth_header(),
         json={
-            "provider": "openbulma",
+            "provider": "agent_bridge",
             "approvalId": "approval-1",
             "approved": True,
         },
@@ -294,14 +294,14 @@ def test_universal_task_lifecycle_routes(monkeypatch: pytest.MonkeyPatch) -> Non
         "/v1/universal/tasks/task-1/retry",
         headers=_auth_header(),
         json={
-            "provider": "openbulma",
+            "provider": "agent_bridge",
             "operator": "operator",
         },
     )
     cancel_resp = client.post(
         "/v1/universal/tasks/task-1/cancel",
         headers=_auth_header(),
-        json={"provider": "openbulma"},
+        json={"provider": "agent_bridge"},
     )
 
     assert create_resp.status_code == 200
@@ -343,7 +343,7 @@ def test_task_contract_mismatch_blocks_mutating_task_routes_when_enforced(
     )
     calls = {"run_task": 0}
 
-    provider = OpenBulmaProvider(provider_id="openbulma", base_url="http://127.0.0.1:1")
+    provider = AgentBridgeProvider(provider_id="agent_bridge", base_url="http://127.0.0.1:1")
 
     async def _get_task_contract():
         return {
@@ -370,7 +370,7 @@ def test_task_contract_mismatch_blocks_mutating_task_routes_when_enforced(
     resolved = SimpleNamespace(
         provider=provider,
         providers=[provider],
-        provider_id="openbulma",
+        provider_id="agent_bridge",
         model_id="assistant",
         profile_id=None,
         auth_source="provider-config:no-auth-header",
@@ -385,7 +385,7 @@ def test_task_contract_mismatch_blocks_mutating_task_routes_when_enforced(
     response = client.post(
         "/v1/universal/tasks",
         headers=_auth_header(),
-        json={"provider": "openbulma", "task": {"objective": "contract check"}},
+        json={"provider": "agent_bridge", "task": {"objective": "contract check"}},
     )
 
     assert response.status_code == 409
@@ -410,7 +410,7 @@ def test_task_contract_mismatch_monitor_mode_allows_mutation(
     )
     calls = {"run_task": 0}
 
-    provider = OpenBulmaProvider(provider_id="openbulma", base_url="http://127.0.0.1:1")
+    provider = AgentBridgeProvider(provider_id="agent_bridge", base_url="http://127.0.0.1:1")
 
     async def _get_task_contract():
         return {
@@ -437,7 +437,7 @@ def test_task_contract_mismatch_monitor_mode_allows_mutation(
     resolved = SimpleNamespace(
         provider=provider,
         providers=[provider],
-        provider_id="openbulma",
+        provider_id="agent_bridge",
         model_id="assistant",
         profile_id=None,
         auth_source="provider-config:no-auth-header",
@@ -452,7 +452,7 @@ def test_task_contract_mismatch_monitor_mode_allows_mutation(
     response = client.post(
         "/v1/universal/tasks",
         headers=_auth_header(),
-        json={"provider": "openbulma", "task": {"objective": "monitor mode"}},
+        json={"provider": "agent_bridge", "task": {"objective": "monitor mode"}},
     )
 
     assert response.status_code == 200
@@ -474,7 +474,7 @@ def test_universal_contract_status_endpoint(
         ),
     )
 
-    provider = OpenBulmaProvider(provider_id="openbulma", base_url="http://127.0.0.1:1")
+    provider = AgentBridgeProvider(provider_id="agent_bridge", base_url="http://127.0.0.1:1")
 
     async def _get_task_contract():
         return {
@@ -496,7 +496,7 @@ def test_universal_contract_status_endpoint(
     resolved = SimpleNamespace(
         provider=provider,
         providers=[provider],
-        provider_id="openbulma",
+        provider_id="agent_bridge",
         model_id="assistant",
         profile_id=None,
         auth_source="provider-config:no-auth-header",
@@ -523,7 +523,7 @@ def test_task_create_idempotency_replay(monkeypatch: pytest.MonkeyPatch) -> None
     _patch_config(monkeypatch, Config(server_token="server-secret"))
     calls = {"count": 0}
 
-    provider = OpenBulmaProvider(provider_id="openbulma", base_url="http://127.0.0.1:1")
+    provider = AgentBridgeProvider(provider_id="agent_bridge", base_url="http://127.0.0.1:1")
 
     async def _run_task(task_input):
         calls["count"] += 1
@@ -534,7 +534,7 @@ def test_task_create_idempotency_replay(monkeypatch: pytest.MonkeyPatch) -> None
     resolved = SimpleNamespace(
         provider=provider,
         providers=[provider],
-        provider_id="openbulma",
+        provider_id="agent_bridge",
         model_id="assistant",
         profile_id=None,
         auth_source="provider-config:no-auth-header",
@@ -547,7 +547,7 @@ def test_task_create_idempotency_replay(monkeypatch: pytest.MonkeyPatch) -> None
         "Idempotency-Key": "idem-create-1",
     }
     body = {
-        "provider": "openbulma",
+        "provider": "agent_bridge",
         "task": {"objective": "idempotent-create"},
     }
     first = client.post("/v1/universal/tasks", headers=headers, json=body)
@@ -565,7 +565,7 @@ def test_task_create_idempotency_conflict(monkeypatch: pytest.MonkeyPatch) -> No
     _patch_config(monkeypatch, Config(server_token="server-secret"))
     calls = {"count": 0}
 
-    provider = OpenBulmaProvider(provider_id="openbulma", base_url="http://127.0.0.1:1")
+    provider = AgentBridgeProvider(provider_id="agent_bridge", base_url="http://127.0.0.1:1")
 
     async def _run_task(task_input):
         calls["count"] += 1
@@ -576,7 +576,7 @@ def test_task_create_idempotency_conflict(monkeypatch: pytest.MonkeyPatch) -> No
     resolved = SimpleNamespace(
         provider=provider,
         providers=[provider],
-        provider_id="openbulma",
+        provider_id="agent_bridge",
         model_id="assistant",
         profile_id=None,
         auth_source="provider-config:no-auth-header",
@@ -591,12 +591,12 @@ def test_task_create_idempotency_conflict(monkeypatch: pytest.MonkeyPatch) -> No
     first = client.post(
         "/v1/universal/tasks",
         headers=headers,
-        json={"provider": "openbulma", "task": {"objective": "first"}},
+        json={"provider": "agent_bridge", "task": {"objective": "first"}},
     )
     second = client.post(
         "/v1/universal/tasks",
         headers=headers,
-        json={"provider": "openbulma", "task": {"objective": "second"}},
+        json={"provider": "agent_bridge", "task": {"objective": "second"}},
     )
 
     assert first.status_code == 200
@@ -612,7 +612,7 @@ async def test_task_create_idempotency_concurrent_replay(
     _patch_config(monkeypatch, Config(server_token="server-secret"))
     calls = {"count": 0}
 
-    provider = OpenBulmaProvider(provider_id="openbulma", base_url="http://127.0.0.1:1")
+    provider = AgentBridgeProvider(provider_id="agent_bridge", base_url="http://127.0.0.1:1")
 
     async def _run_task(task_input):
         calls["count"] += 1
@@ -624,7 +624,7 @@ async def test_task_create_idempotency_concurrent_replay(
     resolved = SimpleNamespace(
         provider=provider,
         providers=[provider],
-        provider_id="openbulma",
+        provider_id="agent_bridge",
         model_id="assistant",
         profile_id=None,
         auth_source="provider-config:no-auth-header",
@@ -636,7 +636,7 @@ async def test_task_create_idempotency_concurrent_replay(
         "Authorization": "Bearer server-secret",
         "Idempotency-Key": "idem-concurrent",
     }
-    body = {"provider": "openbulma", "task": {"objective": "parallel"}}
+    body = {"provider": "agent_bridge", "task": {"objective": "parallel"}}
 
     async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
         first, second = await asyncio.gather(
@@ -659,7 +659,7 @@ def test_lifecycle_mutations_idempotent(monkeypatch: pytest.MonkeyPatch) -> None
         "cancel": 0,
     }
 
-    provider = OpenBulmaProvider(provider_id="openbulma", base_url="http://127.0.0.1:1")
+    provider = AgentBridgeProvider(provider_id="agent_bridge", base_url="http://127.0.0.1:1")
 
     async def _approve_task(task_id, approval_id, approved=True):
         calls["approve"] += 1
@@ -680,7 +680,7 @@ def test_lifecycle_mutations_idempotent(monkeypatch: pytest.MonkeyPatch) -> None
     resolved = SimpleNamespace(
         provider=provider,
         providers=[provider],
-        provider_id="openbulma",
+        provider_id="agent_bridge",
         model_id="assistant",
         profile_id=None,
         auth_source="provider-config:no-auth-header",
@@ -690,17 +690,17 @@ def test_lifecycle_mutations_idempotent(monkeypatch: pytest.MonkeyPatch) -> None
     client = TestClient(app)
 
     approve_headers = {**_auth_header(), "Idempotency-Key": "idem-approve-1"}
-    approve_body = {"provider": "openbulma", "approvalId": "approval-1", "approved": True}
+    approve_body = {"provider": "agent_bridge", "approvalId": "approval-1", "approved": True}
     a1 = client.post("/v1/universal/tasks/task-7/approve", headers=approve_headers, json=approve_body)
     a2 = client.post("/v1/universal/tasks/task-7/approve", headers=approve_headers, json=approve_body)
 
     retry_headers = {**_auth_header(), "Idempotency-Key": "idem-retry-1"}
-    retry_body = {"provider": "openbulma", "operator": "operator"}
+    retry_body = {"provider": "agent_bridge", "operator": "operator"}
     r1 = client.post("/v1/universal/tasks/task-7/retry", headers=retry_headers, json=retry_body)
     r2 = client.post("/v1/universal/tasks/task-7/retry", headers=retry_headers, json=retry_body)
 
     cancel_headers = {**_auth_header(), "Idempotency-Key": "idem-cancel-1"}
-    cancel_body = {"provider": "openbulma"}
+    cancel_body = {"provider": "agent_bridge"}
     c1 = client.post("/v1/universal/tasks/task-7/cancel", headers=cancel_headers, json=cancel_body)
     c2 = client.post("/v1/universal/tasks/task-7/cancel", headers=cancel_headers, json=cancel_body)
 
@@ -716,7 +716,7 @@ def test_lifecycle_mutations_idempotent(monkeypatch: pytest.MonkeyPatch) -> None
 
 def test_universal_task_list_and_events_routes(monkeypatch: pytest.MonkeyPatch) -> None:
     _patch_config(monkeypatch, Config(server_token="server-secret"))
-    provider = OpenBulmaProvider(provider_id="openbulma", base_url="http://127.0.0.1:1")
+    provider = AgentBridgeProvider(provider_id="agent_bridge", base_url="http://127.0.0.1:1")
 
     async def _list_tasks():
         return [
@@ -737,7 +737,7 @@ def test_universal_task_list_and_events_routes(monkeypatch: pytest.MonkeyPatch) 
     resolved = SimpleNamespace(
         provider=provider,
         providers=[provider],
-        provider_id="openbulma",
+        provider_id="agent_bridge",
         model_id="assistant",
         profile_id=None,
         auth_source="provider-config:no-auth-header",
@@ -763,7 +763,7 @@ def test_universal_task_list_and_events_routes(monkeypatch: pytest.MonkeyPatch) 
 
 def test_universal_task_wait_terminal_and_timeout(monkeypatch: pytest.MonkeyPatch) -> None:
     _patch_config(monkeypatch, Config(server_token="server-secret"))
-    provider = OpenBulmaProvider(provider_id="openbulma", base_url="http://127.0.0.1:1")
+    provider = AgentBridgeProvider(provider_id="agent_bridge", base_url="http://127.0.0.1:1")
     state = {"calls": 0}
 
     async def _get_task(task_id):
@@ -777,7 +777,7 @@ def test_universal_task_wait_terminal_and_timeout(monkeypatch: pytest.MonkeyPatc
     resolved = SimpleNamespace(
         provider=provider,
         providers=[provider],
-        provider_id="openbulma",
+        provider_id="agent_bridge",
         model_id="assistant",
         profile_id=None,
         auth_source="provider-config:no-auth-header",
@@ -788,7 +788,7 @@ def test_universal_task_wait_terminal_and_timeout(monkeypatch: pytest.MonkeyPatc
     ok_resp = client.post(
         "/v1/universal/tasks/task-9/wait",
         headers=_auth_header(),
-        json={"provider": "openbulma", "timeoutMs": 3000, "pollMs": 200},
+        json={"provider": "agent_bridge", "timeoutMs": 3000, "pollMs": 200},
     )
     assert ok_resp.status_code == 200
     assert ok_resp.json()["object"] == "universal.task.wait"
@@ -803,7 +803,7 @@ def test_universal_task_wait_terminal_and_timeout(monkeypatch: pytest.MonkeyPatc
     timeout_resp = client.post(
         "/v1/universal/tasks/task-10/wait",
         headers=_auth_header(),
-        json={"provider": "openbulma", "timeoutMs": 1000, "pollMs": 200},
+        json={"provider": "agent_bridge", "timeoutMs": 1000, "pollMs": 200},
     )
     assert timeout_resp.status_code == 408
     assert timeout_resp.json()["object"] == "universal.task.wait"
@@ -827,7 +827,7 @@ def test_universal_scope_enforcement_for_read_and_write(monkeypatch: pytest.Monk
     create_resp = client.post(
         "/v1/universal/tasks",
         headers=_auth_header("read-secret"),
-        json={"provider": "openbulma", "task": {"objective": "scope-check"}},
+        json={"provider": "agent_bridge", "task": {"objective": "scope-check"}},
     )
     list_resp = client.get(
         "/v1/universal/tasks",
@@ -853,7 +853,7 @@ def test_task_ownership_enforced_and_admin_bypasses(monkeypatch: pytest.MonkeyPa
     )
     _patch_config(monkeypatch, cfg)
 
-    provider = OpenBulmaProvider(provider_id="openbulma", base_url="http://127.0.0.1:1")
+    provider = AgentBridgeProvider(provider_id="agent_bridge", base_url="http://127.0.0.1:1")
 
     async def _run_task(task_input):
         objective = str(task_input.get("objective") or "").strip().lower()
@@ -879,7 +879,7 @@ def test_task_ownership_enforced_and_admin_bypasses(monkeypatch: pytest.MonkeyPa
     resolved = SimpleNamespace(
         provider=provider,
         providers=[provider],
-        provider_id="openbulma",
+        provider_id="agent_bridge",
         model_id="assistant",
         profile_id=None,
         auth_source="provider-config:no-auth-header",
@@ -890,12 +890,12 @@ def test_task_ownership_enforced_and_admin_bypasses(monkeypatch: pytest.MonkeyPa
     owner_create = client.post(
         "/v1/universal/tasks",
         headers=_auth_header("owner-secret"),
-        json={"provider": "openbulma", "task": {"objective": "owner"}},
+        json={"provider": "agent_bridge", "task": {"objective": "owner"}},
     )
     other_create = client.post(
         "/v1/universal/tasks",
         headers=_auth_header("other-secret"),
-        json={"provider": "openbulma", "task": {"objective": "other"}},
+        json={"provider": "agent_bridge", "task": {"objective": "other"}},
     )
     other_status_owner = client.get(
         "/v1/universal/tasks/task-owner",
@@ -935,7 +935,7 @@ def test_idempotency_key_is_actor_scoped(monkeypatch: pytest.MonkeyPatch) -> Non
     _patch_config(monkeypatch, cfg)
     calls = {"count": 0}
 
-    provider = OpenBulmaProvider(provider_id="openbulma", base_url="http://127.0.0.1:1")
+    provider = AgentBridgeProvider(provider_id="agent_bridge", base_url="http://127.0.0.1:1")
 
     async def _run_task(task_input):
         calls["count"] += 1
@@ -946,7 +946,7 @@ def test_idempotency_key_is_actor_scoped(monkeypatch: pytest.MonkeyPatch) -> Non
     resolved = SimpleNamespace(
         provider=provider,
         providers=[provider],
-        provider_id="openbulma",
+        provider_id="agent_bridge",
         model_id="assistant",
         profile_id=None,
         auth_source="provider-config:no-auth-header",
@@ -962,7 +962,7 @@ def test_idempotency_key_is_actor_scoped(monkeypatch: pytest.MonkeyPatch) -> Non
         **_auth_header("other-secret"),
         "Idempotency-Key": "idem-actor-scope",
     }
-    body = {"provider": "openbulma", "task": {"objective": "actor-scope"}}
+    body = {"provider": "agent_bridge", "task": {"objective": "actor-scope"}}
 
     first = client.post("/v1/universal/tasks", headers=headers_owner, json=body)
     second = client.post("/v1/universal/tasks", headers=headers_other, json=body)
@@ -985,7 +985,7 @@ def test_idempotency_replay_survives_cache_reset(monkeypatch: pytest.MonkeyPatch
     monkeypatch.setattr(routes_module, "load_config", lambda: cfg)
     calls = {"count": 0}
 
-    provider = OpenBulmaProvider(provider_id="openbulma", base_url="http://127.0.0.1:1")
+    provider = AgentBridgeProvider(provider_id="agent_bridge", base_url="http://127.0.0.1:1")
 
     async def _run_task(task_input):
         calls["count"] += 1
@@ -996,7 +996,7 @@ def test_idempotency_replay_survives_cache_reset(monkeypatch: pytest.MonkeyPatch
     resolved = SimpleNamespace(
         provider=provider,
         providers=[provider],
-        provider_id="openbulma",
+        provider_id="agent_bridge",
         model_id="assistant",
         profile_id=None,
         auth_source="provider-config:no-auth-header",
@@ -1005,7 +1005,7 @@ def test_idempotency_replay_survives_cache_reset(monkeypatch: pytest.MonkeyPatch
 
     client = TestClient(app)
     headers = {**_auth_header(), "Idempotency-Key": "idem-durable-reset-1"}
-    body = {"provider": "openbulma", "task": {"objective": "durable replay"}}
+    body = {"provider": "agent_bridge", "task": {"objective": "durable replay"}}
 
     first = client.post("/v1/universal/tasks", headers=headers, json=body)
     reset_durable_state_store_cache()
@@ -1035,7 +1035,7 @@ def test_task_owner_survives_cache_reset(monkeypatch: pytest.MonkeyPatch) -> Non
     monkeypatch.setattr(config_routes_module, "load_config", lambda: cfg)
     monkeypatch.setattr(routes_module, "load_config", lambda: cfg)
 
-    provider = OpenBulmaProvider(provider_id="openbulma", base_url="http://127.0.0.1:1")
+    provider = AgentBridgeProvider(provider_id="agent_bridge", base_url="http://127.0.0.1:1")
 
     async def _run_task(task_input):
         return {"taskId": "task-persist-owner", "status": "queued"}
@@ -1049,7 +1049,7 @@ def test_task_owner_survives_cache_reset(monkeypatch: pytest.MonkeyPatch) -> Non
     resolved = SimpleNamespace(
         provider=provider,
         providers=[provider],
-        provider_id="openbulma",
+        provider_id="agent_bridge",
         model_id="assistant",
         profile_id=None,
         auth_source="provider-config:no-auth-header",
@@ -1060,7 +1060,7 @@ def test_task_owner_survives_cache_reset(monkeypatch: pytest.MonkeyPatch) -> Non
     create = client.post(
         "/v1/universal/tasks",
         headers=_auth_header("owner-secret"),
-        json={"provider": "openbulma", "task": {"objective": "persist-owner"}},
+        json={"provider": "agent_bridge", "task": {"objective": "persist-owner"}},
     )
     assert create.status_code == 200
 

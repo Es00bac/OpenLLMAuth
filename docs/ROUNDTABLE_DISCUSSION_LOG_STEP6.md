@@ -1,9 +1,9 @@
 # Roundtable Discussion Log - Step 6
 
-Decision Topic: What should be the next highest-value step after OpenBulma contract-header enforcement, while keeping `openbulma-v4` as the main project focus?
+Decision Topic: What should be the next highest-value step after Agent Bridge contract-header enforcement, while keeping `agent_bridge-v4` as the main project focus?
 
 ## Round 1 - Initial Recommendations
-- Euler | The Core Architect | concurrency/state-machine integrity: Add contract-header validation telemetry counters in `openbulma-v4` and expose a status endpoint so enforcement decisions are observable and auditable.
+- Euler | The Core Architect | concurrency/state-machine integrity: Add contract-header validation telemetry counters in `agent_bridge-v4` and expose a status endpoint so enforcement decisions are observable and auditable.
 - The Auth Hacker | protocol/auth compatibility across gateways: Keep header checks strict in `enforce`, but add structured diagnostics so integration clients can self-correct header mismatches quickly.
 - James | The Cognitive Systems Engineer | delivery sequencing and operator usability: Avoid another policy change first; ship visibility now so operator can see what monitor mode is catching before ratcheting enforcement.
 - Averroes | The Memory Archivist | durable state and historical truth: Persist the latest mismatch sample and counters to state snapshots through existing runtime endpoints.
@@ -36,7 +36,7 @@ Decision Topic: What should be the next highest-value step after OpenBulma contr
 - The Integration Ambassador: Vote = same; additive endpoint preserves compatibility.
 
 ## Convergence
-- Consensus next slice: Add OpenBulma contract-header diagnostics endpoint with policy/version metadata, total counters, per-operation counters, and `lastFailure` sample.
+- Consensus next slice: Add Agent Bridge contract-header diagnostics endpoint with policy/version metadata, total counters, per-operation counters, and `lastFailure` sample.
 - Immediate follow-on: Optional threshold alerts in runtime health when mismatch rate spikes.
 - Key risk: Over-logging in monitor mode can create noise.
 - Mitigation: keep payload concise, maintain additive endpoint, and avoid changing mutating route success semantics.

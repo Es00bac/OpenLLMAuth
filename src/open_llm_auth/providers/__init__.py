@@ -6,7 +6,7 @@ from .codex_cli import CodexCliProvider
 from .minimax import MinimaxProvider
 from .openai_codex import OpenAICodexProvider
 from .openai_provider import OpenAIProvider
-from .openbulma import OpenBulmaProvider
+from .agent_bridge import AgentBridgeProvider
 
 __all__ = [
     "BaseProvider",
@@ -15,7 +15,7 @@ __all__ = [
     "AnthropicCompatibleProvider",
     "BedrockConverseProvider",
     "MinimaxProvider",
-    "OpenBulmaProvider",
+    "AgentBridgeProvider",
     "ClaudeCliProvider",
     "CodexCliProvider",
 ]

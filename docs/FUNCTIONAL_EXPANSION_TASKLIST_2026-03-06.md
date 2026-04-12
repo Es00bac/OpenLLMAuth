@@ -1,6 +1,6 @@
 # Functional Expansion Tasklist (2026-03-06)
 
-Scope: OpenBulma audit item 2 for `open_llm_auth`
+Scope: Agent Bridge audit item 2 for `open_llm_auth`
 
 ## Expert Personas Applied
 - Core Architect: provider wiring and gateway integration paths.

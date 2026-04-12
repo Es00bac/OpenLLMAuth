@@ -2,7 +2,7 @@
 
 ## Round 1 - Proposal
 
-The Core Architect: Add explicit contract-context headers on gateway to openbulma mutating task calls.
+The Core Architect: Add explicit contract-context headers on gateway to agent_bridge mutating task calls.
 
 The Auth Hacker: Use stable names: `X-Provider-Contract-Version`, `X-Gateway-Version`, `X-Request-Id`.
 
@@ -24,7 +24,7 @@ The Dashboard Weaver: Header metadata should surface in API diagnostics later; n
 
 - Consensus slice: **Gateway outbound contract headers on mutating task calls**.
 - Scope:
-  - open_llm_auth sets contract headers on openbulma mutating routes.
-  - no strict inbound enforcement on openbulma yet (deferred to next step).
+  - open_llm_auth sets contract headers on agent_bridge mutating routes.
+  - no strict inbound enforcement on agent_bridge yet (deferred to next step).
   - add tests that verify header propagation.
 

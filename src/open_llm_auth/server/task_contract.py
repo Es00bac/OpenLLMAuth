@@ -1,7 +1,7 @@
-"""Compatibility checks for mutating OpenBulma task routes.
+"""Compatibility checks for mutating Agent Bridge task routes.
 
 The universal task API can create, approve, retry, or cancel tasks against an
-OpenBulma runtime. This module probes the runtime contract endpoint and decides
+Agent Bridge runtime. This module probes the runtime contract endpoint and decides
 whether the gateway should allow those mutations, cache the result, or fail
 closed according to `taskContract` config.
 """
@@ -15,7 +15,7 @@ from typing import Any, Dict
 import httpx
 
 from ..config import Config
-from ..providers.openbulma import OpenBulmaProvider
+from ..providers.agent_bridge import AgentBridgeProvider
 
 
 GATEWAY_TASK_CONTRACT_VERSION = "1.0"
@@ -39,7 +39,7 @@ def reset_task_contract_cache() -> None:
 
 async def evaluate_task_contract(
     *,
-    provider: OpenBulmaProvider,
+    provider: AgentBridgeProvider,
     cfg: Config,
 ) -> TaskContractDecision:
     """Probe the runtime contract endpoint and cache the compatibility decision."""
@@ -85,7 +85,7 @@ async def evaluate_task_contract(
 
 async def get_task_contract_status(
     *,
-    provider: OpenBulmaProvider,
+    provider: AgentBridgeProvider,
     cfg: Config,
 ) -> Dict[str, Any]:
     """Return a JSON-ready status envelope for contract introspection."""
@@ -110,13 +110,13 @@ async def get_task_contract_status(
     }
 
 
-def _cache_key(provider: OpenBulmaProvider) -> str:
+def _cache_key(provider: AgentBridgeProvider) -> str:
     return f"{provider.provider_id}|{provider.base_url}"
 
 
 async def _fetch_and_validate(
     *,
-    provider: OpenBulmaProvider,
+    provider: AgentBridgeProvider,
     cfg: Config,
 ) -> TaskContractDecision:
     contract_cfg = cfg.task_contract

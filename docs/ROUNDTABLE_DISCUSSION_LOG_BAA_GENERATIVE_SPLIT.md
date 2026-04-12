@@ -15,7 +15,7 @@ Decision Topic: Should we split the BAA execution adapter into two distinct path
 
 ## Round 1 - Initial Positions
 
-**The Core Architect**: The split is architecturally sound. The current `LiveExecutionAdapter` conflates two fundamentally different workflows. The `TaskLifecycleMachine` already supports `verifying → executing` transitions (line 62 of the state machine), which is exactly the "soft rollback" path the generative adapter needs. However, I have a concern: the `BulmaAssistantAgent.runAttempt()` method (lines 341-446) hardcodes the phase sequence `detect → snapshot → reproduce → diagnose → patch → verify → deploy → postcheck`. The generative adapter needs a different phase sequence — we should not fork `runAttempt()` but instead let the adapter itself declare which phases to skip. I propose an `adapter.requiredPhases()` method that the agent consults.
+**The Core Architect**: The split is architecturally sound. The current `LiveExecutionAdapter` conflates two fundamentally different workflows. The `TaskLifecycleMachine` already supports `verifying → executing` transitions (line 62 of the state machine), which is exactly the "soft rollback" path the generative adapter needs. However, I have a concern: the `AgentAssistantAgent.runAttempt()` method (lines 341-446) hardcodes the phase sequence `detect → snapshot → reproduce → diagnose → patch → verify → deploy → postcheck`. The generative adapter needs a different phase sequence — we should not fork `runAttempt()` but instead let the adapter itself declare which phases to skip. I propose an `adapter.requiredPhases()` method that the agent consults.
 
 **The Auth Hacker**: A 100-step loop will consume roughly 6-7x the tokens of the current 15-step loop. With `open_llm_auth`'s current exponential backoff in the provider manager, a sustained 100-step burst could hit the backoff ceiling and stall mid-generation. The current backoff starts at 1s and doubles — by the 5th retry we're at 16s waits. For a generative loop, we need either: (a) a higher rate-limit budget allocated per-task in the gateway, or (b) a "burst mode" flag in the auth profile that uses a more aggressive retry schedule. I'd recommend (b) — add a `burstMode: boolean` to `AgentTaskInput` that the gateway honors with shorter backoff windows.
 
@@ -31,7 +31,7 @@ Decision Topic: Should we split the BAA execution adapter into two distinct path
 
 **The Dashboard Weaver**: A 100-step generative task could run for 15-30 minutes. The current dashboard shows task status as a simple badge (queued/running/done/failed). For generative tasks, we need: (a) a **progress bar** showing current step / max steps, (b) a **live activity feed** showing the last 3-5 tool calls with timestamps, (c) a **phase indicator** that distinguishes "writing code" vs "running tests" vs "fixing errors" within the generative loop, (d) estimated time remaining based on average step duration. The `BaaProgressEvent` already emits per-phase — we just need the generative adapter to emit more granular sub-phase events.
 
-**The Integration Ambassador**: Users interact with Bulma primarily through Telegram. A 15-30 minute generative task with no feedback will make users think the bot crashed. We need: (a) periodic progress messages every 20-30 steps or every 5 minutes (whichever comes first), (b) the message should include: current step, last action taken, current file being modified, and a one-line summary of what was just built, (c) a "working on it..." typing indicator in Telegram during active processing, (d) an explicit "task started" and "task completed" notification pair. The EventBus already has `BaaProgressEvent` — I can hook a Telegram notifier to it, but the generative adapter needs to emit richer progress payloads than the current adapter does.
+**The Integration Ambassador**: Users interact with Agent primarily through Telegram. A 15-30 minute generative task with no feedback will make users think the bot crashed. We need: (a) periodic progress messages every 20-30 steps or every 5 minutes (whichever comes first), (b) the message should include: current step, last action taken, current file being modified, and a one-line summary of what was just built, (c) a "working on it..." typing indicator in Telegram during active processing, (d) an explicit "task started" and "task completed" notification pair. The EventBus already has `BaaProgressEvent` — I can hook a Telegram notifier to it, but the generative adapter needs to emit richer progress payloads than the current adapter does.
 
 ## Round 2 - Cross-Critique and Refinement
 
@@ -99,7 +99,7 @@ Decision Topic: Should we split the BAA execution adapter into two distinct path
 
 **Consensus on implementation priorities** (ordered):
 
-1. **Phase 1 (Types + Routing)**: Add `taskMode: 'repair' | 'generate'` to `AgentTaskInput`. Route in `BulmaAssistantAgent` based on mode. Add `adapter.requiredPhases()` so the agent doesn't hardcode phase sequences.
+1. **Phase 1 (Types + Routing)**: Add `taskMode: 'repair' | 'generate'` to `AgentTaskInput`. Route in `AgentAssistantAgent` based on mode. Add `adapter.requiredPhases()` so the agent doesn't hardcode phase sequences.
 
 2. **Phase 2 (Adapter Core)**: Create `LiveGenerativeAdapter.ts` with:
    - Bypass reproduce phase
@@ -145,7 +145,7 @@ Decision Topic: Should we split the BAA execution adapter into two distinct path
 
 **What changes**: Split the BAA execution pathway into two adapters — `LiveRepairAdapter` (renamed from current `LiveExecutionAdapter`, no behavioral changes) and `LiveGenerativeAdapter` (new, for feature-building tasks).
 
-**Why**: The current 15-step repair loop with hard rollback destroys valid generative work when it can't verify within the iteration budget. Users who ask Bulma to build features get their work wiped. The generative adapter uses a higher iteration budget (80 steps), soft rollbacks (feed errors back instead of reset), token-budget-aware compaction, incremental checkpoints, and structured context management to support long-running feature development.
+**Why**: The current 15-step repair loop with hard rollback destroys valid generative work when it can't verify within the iteration budget. Users who ask Agent to build features get their work wiped. The generative adapter uses a higher iteration budget (80 steps), soft rollbacks (feed errors back instead of reset), token-budget-aware compaction, incremental checkpoints, and structured context management to support long-running feature development.
 
 **Risk**: Context collapse in long loops (mitigated by token-aware compaction that adapts to model context window size), increased attack surface from more iterations (mitigated by mode-aware safety constraints and filesystem watchlist), git checkpoint overhead (mitigated by compaction-aligned intervals).
 

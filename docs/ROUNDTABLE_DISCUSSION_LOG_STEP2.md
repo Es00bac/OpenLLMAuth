@@ -2,7 +2,7 @@
 
 ## Round 1 - Proposals
 
-The Core Architect: Next slice should be a task contract handshake between gateway and agent. Add `/v1/agent/contract` in openbulma-v4 and gate mutating universal task routes in open_llm_auth.
+The Core Architect: Next slice should be a task contract handshake between gateway and agent. Add `/v1/agent/contract` in agent_bridge-v4 and gate mutating universal task routes in open_llm_auth.
 
 The Auth Hacker: Agree. We need contract version + schema hash, then pin that in gateway and reject mismatches on task mutation calls.
 
@@ -44,7 +44,7 @@ The Dashboard Weaver: Defer UI work; keep diagnostic payload API-first for now.
 
 - Consensus next slice: **Task Contract Handshake v1**.
 - Scope for this step:
-  - Add openbulma-v4 contract endpoint.
+  - Add agent_bridge-v4 contract endpoint.
   - Add open_llm_auth contract fetch/check helper.
   - Gate mutating universal task routes by contract compatibility.
   - Preserve read-route availability under mismatch.

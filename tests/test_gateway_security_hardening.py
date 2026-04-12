@@ -59,7 +59,7 @@ def test_fail_closed_requires_token_by_default(monkeypatch: pytest.MonkeyPatch) 
     tasks_resp = client.get("/v1/universal/tasks")
     wait_resp = client.post(
         "/v1/universal/tasks/task-1/wait",
-        json={"provider": "openbulma", "timeoutMs": 1000, "pollMs": 200},
+        json={"provider": "agent_bridge", "timeoutMs": 1000, "pollMs": 200},
     )
 
     assert models_resp.status_code == 401
@@ -246,7 +246,7 @@ def test_config_save_provider_blocks_metadata_destination(
     }
 
 
-def test_config_save_provider_allows_openbulma_loopback(
+def test_config_save_provider_allows_agent_bridge_loopback(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.delenv("OPEN_LLM_AUTH_ALLOW_ANON", raising=False)
@@ -256,7 +256,7 @@ def test_config_save_provider_allows_openbulma_loopback(
 
     client = TestClient(app)
     response = client.put(
-        "/config/providers/openbulma",
+        "/config/providers/agent_bridge",
         headers={"Authorization": "Bearer server-secret"},
         json={
             "base_url": "http://127.0.0.1:20100/v1",

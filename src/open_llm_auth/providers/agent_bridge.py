@@ -10,14 +10,14 @@ import httpx
 from .base import BaseProvider
 
 
-class OpenBulmaProvider(BaseProvider):
+class AgentBridgeProvider(BaseProvider):
     """
-    Bridge a standard gateway request into a live OpenBulma runtime.
+    Bridge a standard gateway request into a live Agent Bridge runtime.
 
-    Important behavioral mismatch: OpenBulma chat is transport-level single-turn,
+    Important behavioral mismatch: Agent Bridge chat is transport-level single-turn,
     while callers coming through this gateway often expect transcript continuity.
     This adapter rebuilds a bounded continuity block before forwarding chat and
-    synthesizes task streaming by polling OpenBulma task state/events.
+    synthesizes task streaming by polling Agent Bridge task state/events.
     """
     CONTRACT_HEADER_VERSION = "1.0"
     GATEWAY_VERSION = "open_llm_auth/1.0"
@@ -66,15 +66,15 @@ class OpenBulmaProvider(BaseProvider):
 
             task_id = task_data.get("taskId", "unknown")
             status = task_data.get("status", "queued")
-            content = f"OpenBulma task queued: {task_id} (status: {status})"
+            content = f"Agent Bridge task queued: {task_id} (status: {status})"
             if isinstance(task_data.get("result"), str) and task_data["result"].strip():
                 content = task_data["result"].strip()
 
             return {
-                "id": f"bulma-task-{task_id}",
+                "id": f"agent-task-{task_id}",
                 "object": "chat.completion",
                 "created": 0,
-                "model": f"openbulma/{model}",
+                "model": f"agent_bridge/{model}",
                 "choices": [
                     {
                         "index": 0,
@@ -104,17 +104,17 @@ class OpenBulmaProvider(BaseProvider):
                 headers=self.headers,
             )
             response.raise_for_status()
-            bulma_data = response.json()
+            agent_data = response.json()
             
-            # Map OpenBulma's chat payload back into an OpenAI-style envelope so
+            # Map Agent Bridge's chat payload back into an OpenAI-style envelope so
             # ordinary clients can consume the bridge without provider-specific parsing.
-            content = bulma_data.get("reply", bulma_data.get("rawText", ""))
+            content = agent_data.get("reply", agent_data.get("rawText", ""))
             
             return {
-                "id": f"bulma-{bulma_data.get('taskId', 'chat')}",
+                "id": f"agent-{agent_data.get('taskId', 'chat')}",
                 "object": "chat.completion",
                 "created": 0,
-                "model": f"openbulma/{model}",
+                "model": f"agent_bridge/{model}",
                 "choices": [
                     {
                         "index": 0,
@@ -125,7 +125,7 @@ class OpenBulmaProvider(BaseProvider):
                         "finish_reason": "stop",
                     }
                 ],
-                "usage": bulma_data.get("usage") or {
+                "usage": agent_data.get("usage") or {
                     "prompt_tokens": 0,
                     "completion_tokens": 0,
                     "total_tokens": 0,
@@ -141,7 +141,7 @@ class OpenBulmaProvider(BaseProvider):
     ) -> AsyncIterator[bytes]:
         """Return an OpenAI-style stream for chat or task execution."""
         # Streaming task output is emulated by polling task state and events.
-        # Direct OpenBulma chat itself is still request/response.
+        # Direct Agent Bridge chat itself is still request/response.
         if (
             isinstance(payload.get("task"), dict)
             or model.startswith("assistant")
@@ -194,8 +194,8 @@ class OpenBulmaProvider(BaseProvider):
 
         task_data = await self.run_task(body)
         task_id = task_data.get("taskId")
-        chunk_id = f"bulma-task-{task_id or uuid4().hex}"
-        stream_model = f"openbulma/{model}"
+        chunk_id = f"agent-task-{task_id or uuid4().hex}"
+        stream_model = f"agent_bridge/{model}"
 
         async def _poll_task():
             yield self._openai_chunk(
@@ -281,8 +281,8 @@ class OpenBulmaProvider(BaseProvider):
 
     async def list_models(self) -> List[Dict[str, Any]]:
         return [
-            {"id": "bulma", "name": "OpenBulma Agent"},
-            {"id": "assistant", "name": "OpenBulma Assistant (BAA)"},
+            {"id": "agent", "name": "Agent Bridge Agent"},
+            {"id": "assistant", "name": "Agent Bridge Assistant (BAA)"},
         ]
 
     async def run_task(self, task_input: Dict[str, Any]) -> Dict[str, Any]:
@@ -382,7 +382,7 @@ class OpenBulmaProvider(BaseProvider):
             body["authProfile"] = payload["authProfile"].strip()
         if isinstance(payload.get("modelProfile"), str) and payload["modelProfile"].strip():
             body["modelProfile"] = payload["modelProfile"].strip()
-        elif isinstance(model, str) and model.strip() and model not in {"bulma", "assistant"}:
+        elif isinstance(model, str) and model.strip() and model not in {"agent", "assistant"}:
             body["modelProfile"] = model.strip()
 
         return body
@@ -417,7 +417,7 @@ class OpenBulmaProvider(BaseProvider):
         recent_turns = conversational_turns[-cls.CHAT_CONTEXT_TURN_LIMIT :]
         system_blocks = [part.strip() for part in explicit_system_parts if part.strip()]
 
-        # OpenBulma's direct chat API is single-turn. The gateway rebuilds a bounded
+        # Agent Bridge's direct chat API is single-turn. The gateway rebuilds a bounded
         # continuity block from the upstream transcript so external surfaces do not
         # silently lose context when they traverse open_llm_auth.
         if recent_turns:
@@ -486,7 +486,7 @@ class OpenBulmaProvider(BaseProvider):
         created_at = task_data.get("createdAt")
         dispatch_id = task_data.get("dispatchId")
         lines = [
-            f"Queued Bulma task {task_id or 'unknown'} (status: {status}).",
+            f"Queued Agent task {task_id or 'unknown'} (status: {status}).",
             f"Objective: {cls._truncate_text(objective, 800)}",
         ]
         if created_at is not None:

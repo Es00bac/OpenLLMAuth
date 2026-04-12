@@ -22,7 +22,7 @@ The Dashboard Weaver: Response should include contract mode/version headers for 
 
 ## Round 2 - Convergence
 
-- Consensus slice: **OpenBulma optional header enforcement for mutating routes**.
+- Consensus slice: **Agent Bridge optional header enforcement for mutating routes**.
 - Scope:
   - Add policy mode (`off|monitor|enforce`) and accepted version list.
   - In enforce mode, reject missing/mismatched header.

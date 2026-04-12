@@ -62,7 +62,7 @@ class UniversalRequest(BaseModel):
 class UniversalTaskCreateRequest(BaseModel):
     model_config = ConfigDict(extra="allow")
 
-    provider: str = "openbulma"
+    provider: str = "agent_bridge"
     task: Dict[str, Any]
     auth_profile: Optional[str] = Field(default=None, alias="authProfile")
 
@@ -70,7 +70,7 @@ class UniversalTaskCreateRequest(BaseModel):
 class UniversalTaskRetryRequest(BaseModel):
     model_config = ConfigDict(extra="allow")
 
-    provider: str = "openbulma"
+    provider: str = "agent_bridge"
     operator: Optional[str] = None
     auth_profile: Optional[str] = Field(default=None, alias="authProfile")
 
@@ -78,7 +78,7 @@ class UniversalTaskRetryRequest(BaseModel):
 class UniversalTaskApproveRequest(BaseModel):
     model_config = ConfigDict(extra="allow")
 
-    provider: str = "openbulma"
+    provider: str = "agent_bridge"
     approval_id: str = Field(alias="approvalId")
     approved: bool = True
     auth_profile: Optional[str] = Field(default=None, alias="authProfile")
@@ -87,7 +87,7 @@ class UniversalTaskApproveRequest(BaseModel):
 class UniversalTaskCancelRequest(BaseModel):
     model_config = ConfigDict(extra="allow")
 
-    provider: str = "openbulma"
+    provider: str = "agent_bridge"
     auth_profile: Optional[str] = Field(default=None, alias="authProfile")
 
 
@@ -113,7 +113,7 @@ class UniversalTaskEventListResponse(BaseModel):
 class UniversalTaskWaitRequest(BaseModel):
     model_config = ConfigDict(extra="allow")
 
-    provider: str = "openbulma"
+    provider: str = "agent_bridge"
     timeout_ms: int = Field(default=30000, alias="timeoutMs")
     poll_ms: int = Field(default=1000, alias="pollMs")
     auth_profile: Optional[str] = Field(default=None, alias="authProfile")

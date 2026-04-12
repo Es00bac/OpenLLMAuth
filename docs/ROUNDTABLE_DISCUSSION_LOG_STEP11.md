@@ -12,7 +12,7 @@ Decision Topic: After Step 10, overall tests pass but memory still has weak prob
 - The Security Auditor | hallucination resistance and fail-safe behavior
 - The Telemetry Analyst | metrics quality, trend reporting, probe diagnostics
 - The Dashboard Weaver | report clarity and operator observability
-- The Integration Ambassador | cross-project alignment (openbulma-v4 main + open_llm_auth support)
+- The Integration Ambassador | cross-project alignment (agent_bridge-v4 main + open_llm_auth support)
 
 ## Round 1 - Initial Positions
 - The Core Architect: add one focused “evidence-coverage gate” so personal recall answers must reflect retrieved memory terms.
@@ -24,7 +24,7 @@ Decision Topic: After Step 10, overall tests pass but memory still has weak prob
 - The Security Auditor: add negative-memory probes (abstain tests) to track false recall risk.
 - The Telemetry Analyst: include separate “hallucination guard” section in report with pass/fail counts.
 - The Dashboard Weaver: keep report scan-friendly with aggregate first, then failures.
-- The Integration Ambassador: this slice helps openbulma usability without narrowing gateway/provider scope.
+- The Integration Ambassador: this slice helps agent_bridge usability without narrowing gateway/provider scope.
 
 ## Round 2 - Discussion
 - The Core Architect to Memory Archivist: “Can we generalize beyond MemoryTag without hacks?”
@@ -62,7 +62,7 @@ Before Step 11 edits, a second implementation consult pass was run across all 9 
 - The Security Auditor: add explicit anti-hallucination probes with abstain markers + forbidden secret/hostname patterns.
 - The Telemetry Analyst: include per-probe failure-code diagnostics and hallucination signal counts.
 - The Dashboard Weaver: keep report scan-first (failure queue and abstain queue first).
-- The Integration Ambassador: preserve OpenBulma/open_llm_auth contract shapes while tuning internals.
+- The Integration Ambassador: preserve Agent Bridge/open_llm_auth contract shapes while tuning internals.
 
 Consensus addendum:
 1. Enforce stricter explicit-tag grounding (`MemoryTag Mx` must match evidence rows).

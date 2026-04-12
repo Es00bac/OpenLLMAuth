@@ -159,11 +159,11 @@ def test_runtime_egress_policy_blocks_metadata_destination() -> None:
         manager.resolve("evil/test-model")
 
 
-def test_runtime_egress_policy_allows_openbulma_loopback() -> None:
+def test_runtime_egress_policy_allows_agent_bridge_loopback() -> None:
     manager = ProviderManager()
     manager._config = Config(
         providers={
-            "openbulma": ProviderConfig(
+            "agent_bridge": ProviderConfig(
                 base_url="http://127.0.0.1:20100/v1",
                 auth_header=False,
                 auth="api-key",
@@ -172,9 +172,9 @@ def test_runtime_egress_policy_allows_openbulma_loopback() -> None:
     )
     manager.reload = lambda: None  # type: ignore[assignment]
 
-    resolved = manager.resolve("openbulma/assistant")
+    resolved = manager.resolve("agent_bridge/assistant")
 
-    assert resolved.provider_id == "openbulma"
+    assert resolved.provider_id == "agent_bridge"
     assert resolved.provider.base_url == "http://127.0.0.1:20100/v1"
 
 

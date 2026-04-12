@@ -161,7 +161,7 @@ class EgressPolicyConfig(BaseModel):
     fail_closed: bool = Field(default=True, alias="failClosed")
     enforce_https: bool = Field(default=True, alias="enforceHttps")
     allow_local_providers: List[str] = Field(
-        default_factory=lambda: ["openbulma", "agent", "ollama", "vllm", "litellm"],
+        default_factory=lambda: ["agent_bridge", "agent", "ollama", "vllm", "litellm"],
         alias="allowLocalProviders",
     )
     deny_hosts: List[str] = Field(

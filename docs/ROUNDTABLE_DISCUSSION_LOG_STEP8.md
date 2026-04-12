@@ -11,7 +11,7 @@ Decision Topic: harness showed strong task utility but failed memory probes (0/3
 - The Security Auditor | prompt/safety integrity: preserve current safety constraints while improving recall pathways.
 - The Telemetry Analyst | measurable validation: ensure before/after metrics are produced by re-running the same harness.
 - The Dashboard Weaver | operator clarity: add enough signal to explain why recall failed when it fails.
-- The Integration Ambassador | interface compatibility: avoid breaking open_llm_auth/openbulma contracts while fixing recall.
+- The Integration Ambassador | interface compatibility: avoid breaking open_llm_auth/agent_bridge contracts while fixing recall.
 
 ## Round 2 - Critique and Prioritization
 - Core Architect favored fallback retrieval + lightweight diagnostics as fastest practical path.

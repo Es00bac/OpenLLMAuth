@@ -11,7 +11,7 @@ Decision Topic: Are current failures (`schedule-boundary`, `assistant-scope`) ca
 - The Security Auditor | abstain-vs-recall safety tradeoff analysis
 - The Telemetry Analyst | metric interpretation and uplift thresholds
 - The Dashboard Weaver | usability/observability signal clarity
-- The Integration Ambassador | openbulma-v4 main alignment and gateway boundary checks
+- The Integration Ambassador | agent_bridge-v4 main alignment and gateway boundary checks
 
 ## Round 1 - Initial Positions
 - The Core Architect: likely both, but primary issue is memory selection/synthesis contamination.
@@ -22,7 +22,7 @@ Decision Topic: Are current failures (`schedule-boundary`, `assistant-scope`) ca
 - The Security Auditor: abstain improvements can reduce hallucination while reducing recall completeness.
 - The Telemetry Analyst: decisive signal is pass-rate uplift under oracle memory.
 - The Dashboard Weaver: current diagnostics already show failure reasons; keep next step measurable and narrow.
-- The Integration Ambassador: issue is in openbulma-v4 memory-answer path; gateway path can be tested separately.
+- The Integration Ambassador: issue is in agent_bridge-v4 memory-answer path; gateway path can be tested separately.
 
 ## Round 2 - Discussion
 - The Core Architect to group: “Given retrieve pass + chat fail, we need a single decisive experiment before more tuning.”
@@ -45,7 +45,7 @@ Decision Topic: Are current failures (`schedule-boundary`, `assistant-scope`) ca
   4. Compute per-probe uplift and average uplift.
 
 ## Step Card Presented
-- Add a dedicated diagnostic script in `openbulma-v4/scripts/` to run A/B and write markdown+json artifacts.
+- Add a dedicated diagnostic script in `agent_bridge-v4/scripts/` to run A/B and write markdown+json artifacts.
 - Run it against isolated runtime state and report:
   - per-probe A vs B pass rates
   - average uplift in percentage points

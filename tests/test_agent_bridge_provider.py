@@ -9,13 +9,13 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-import open_llm_auth.providers.openbulma as openbulma_module
-from open_llm_auth.providers.openbulma import OpenBulmaProvider
+import open_llm_auth.providers.agent_bridge as agent_bridge_module
+from open_llm_auth.providers.agent_bridge import AgentBridgeProvider
 
 
 @pytest.mark.asyncio
 async def test_mutating_calls_send_contract_headers() -> None:
-    provider = OpenBulmaProvider(provider_id="openbulma", base_url="http://127.0.0.1:1")
+    provider = AgentBridgeProvider(provider_id="agent_bridge", base_url="http://127.0.0.1:1")
     seen: list[dict[str, str]] = []
 
     async def _fake_post(path, payload, *, extra_headers=None):
@@ -41,7 +41,7 @@ async def test_mutating_calls_send_contract_headers() -> None:
 
 @pytest.mark.asyncio
 async def test_chat_completion_forwards_bounded_context_into_system_prompt(monkeypatch: pytest.MonkeyPatch) -> None:
-    provider = OpenBulmaProvider(provider_id="openbulma", base_url="http://127.0.0.1:1")
+    provider = AgentBridgeProvider(provider_id="agent_bridge", base_url="http://127.0.0.1:1")
     seen: dict[str, Any] = {}
 
     class _FakeResponse:
@@ -70,7 +70,7 @@ async def test_chat_completion_forwards_bounded_context_into_system_prompt(monke
             seen["headers"] = headers
             return _FakeResponse({"reply": "context preserved"})
 
-    monkeypatch.setattr(openbulma_module.httpx, "AsyncClient", _FakeAsyncClient)
+    monkeypatch.setattr(agent_bridge_module.httpx, "AsyncClient", _FakeAsyncClient)
 
     response = await provider.chat_completion(
         model="kimi-coding/k2p5",
@@ -98,7 +98,7 @@ async def test_chat_completion_forwards_bounded_context_into_system_prompt(monke
 
 @pytest.mark.asyncio
 async def test_task_stream_polls_runtime_until_terminal(monkeypatch: pytest.MonkeyPatch) -> None:
-    provider = OpenBulmaProvider(provider_id="openbulma", base_url="http://127.0.0.1:1")
+    provider = AgentBridgeProvider(provider_id="agent_bridge", base_url="http://127.0.0.1:1")
     statuses = [
         {
             "id": "task-1",
@@ -177,7 +177,7 @@ async def test_task_stream_polls_runtime_until_terminal(monkeypatch: pytest.Monk
     provider.run_task = _fake_run_task  # type: ignore[method-assign]
     provider.get_task = _fake_get_task  # type: ignore[method-assign]
     provider.get_task_events = _fake_get_task_events  # type: ignore[method-assign]
-    monkeypatch.setattr(openbulma_module.asyncio, "sleep", _fake_sleep)
+    monkeypatch.setattr(agent_bridge_module.asyncio, "sleep", _fake_sleep)
 
     stream = await provider.chat_completion_stream(
         model="assistant",
@@ -187,7 +187,7 @@ async def test_task_stream_polls_runtime_until_terminal(monkeypatch: pytest.Monk
     chunks = [chunk async for chunk in stream]
     content = _collect_stream_content(chunks)
 
-    assert "Queued Bulma task task-1 (status: queued)." in content
+    assert "Queued Agent task task-1 (status: queued)." in content
     assert "Phase update: detect. Summary: detecting incident" in content
     assert "Needs approval. Summary: waiting for approval" in content
     assert "Approval id: approval-1" in content

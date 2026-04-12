@@ -40,7 +40,7 @@ from ..providers import (
     MinimaxProvider,
     OpenAICodexProvider,
     OpenAIProvider,
-    OpenBulmaProvider,
+    AgentBridgeProvider,
 )
 from ..server.egress_policy import validate_outbound_base_url
 
@@ -265,12 +265,12 @@ class ProviderManager:
         return list(by_id.values())
 
     def _all_provider_ids(self) -> List[str]:
-        # `openbulma` and `agent` are exposed by manager logic rather than the
+        # `agent_bridge` and `agent` are exposed by manager logic rather than the
         # builtin provider map because they bridge to a local runtime rather than
         # an upstream HTTP catalog entry.
         configured = set(self._config.all_provider_configs().keys())
         builtin = set(get_all_builtin_provider_ids()) | {
-            "openbulma",
+            "agent_bridge",
             "agent",
             "claude-cli",
             "codex-cli",
@@ -373,19 +373,19 @@ class ProviderManager:
 
         configured_cfg = self._config.all_provider_configs().get(provider)
         mode = (self._config.models.mode or "merge").lower()
-        if provider in {"openbulma", "agent"}:
+        if provider in {"agent_bridge", "agent"}:
             return configured_cfg or ProviderConfig(baseUrl="http://127.0.0.1:20100/v1")
 
         if (
             configured_cfg is None
             and builtin_cfg is None
-            and provider_id not in {"openbulma", "agent"}
+            and provider_id not in {"agent_bridge", "agent"}
         ):
             return None
 
-        if configured_cfg is None and provider_id not in {"openbulma", "agent"}:
+        if configured_cfg is None and provider_id not in {"agent_bridge", "agent"}:
             provider_cfg = builtin_cfg
-        elif builtin_cfg is None and provider_id not in {"openbulma", "agent"}:
+        elif builtin_cfg is None and provider_id not in {"agent_bridge", "agent"}:
             provider_cfg = configured_cfg
         else:
             provider_cfg = builtin_cfg.model_copy(
@@ -1202,8 +1202,8 @@ class ProviderManager:
                 raise ValueError("MiniMax requires an API key.")
             return MinimaxProvider(api_key=api_key, base_url=base_url, headers=headers)
 
-        if provider_id == "openbulma" or provider_id == "agent":
-            return OpenBulmaProvider(
+        if provider_id == "agent_bridge" or provider_id == "agent":
+            return AgentBridgeProvider(
                 provider_id=provider_id,
                 api_key=api_key,
                 base_url=base_url or "http://127.0.0.1:20100/v1",

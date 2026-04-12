@@ -11,7 +11,7 @@ Decision Topic: Step 8 improved scenarios to 7/7 but memory probes remain 0/3. C
 - The Security Auditor | hardening posture: support **A** because no new attack surface is introduced while improving recall quality.
 - The Telemetry Analyst | measurable outcomes: choose **A** since harness can immediately validate before/after using same probes.
 - The Dashboard Weaver | operator visibility: choose **A** first, then expose diagnostics if recall remains weak.
-- The Integration Ambassador | cross-system compatibility: choose **A**; this preserves open_llm_auth/openbulma contracts.
+- The Integration Ambassador | cross-system compatibility: choose **A**; this preserves open_llm_auth/agent_bridge contracts.
 
 ## Round 2 - Critique
 - Majority view: A is the only option that directly targets current failure mode with minimal implementation risk.

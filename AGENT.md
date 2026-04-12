@@ -72,7 +72,7 @@ curl http://127.0.0.1:8080/v1/universal/tasks \
   -H "Content-Type: application/json" \
   -H "Idempotency-Key: task-123" \
   -d '{
-    "provider": "openbulma",
+    "provider": "agent_bridge",
     "task": {"objective": "Inspect the runtime health endpoints."}
   }'
 ```
@@ -81,18 +81,18 @@ Important invariants:
 - task ownership is tracked durably per `(provider, task_id)`
 - non-admin callers can only read/mutate their own tasks
 - `Idempotency-Key` is actor-scoped and fingerprinted against the request payload
-- mutating OpenBulma task routes are gated by task-contract compatibility checks
+- mutating Agent Bridge task routes are gated by task-contract compatibility checks
 
-## OpenBulma-Specific Behavior
+## Agent Bridge-Specific Behavior
 
-The `openbulma` and `agent` providers are local-runtime bridges.
+The `agent_bridge` and `agent` providers are local-runtime bridges.
 
 Current behavior:
-- normal chat requests proxy to OpenBulma `POST /chat`
-- task requests proxy to OpenBulma agent endpoints
+- normal chat requests proxy to Agent Bridge `POST /chat`
+- task requests proxy to Agent Bridge agent endpoints
 - mutating task calls attach contract headers
 - streaming is synthesized by polling task state and task-event history
-- because OpenBulma chat is single-turn, the gateway folds bounded transcript context into a synthetic system block before forwarding
+- because Agent Bridge chat is single-turn, the gateway folds bounded transcript context into a synthetic system block before forwarding
 
 ## Config/Admin API
 
@@ -123,5 +123,5 @@ Config responses redact secrets. Do not expect raw bearer tokens, API keys, refr
 - `src/open_llm_auth/server/task_contract.py`
 - `src/open_llm_auth/server/idempotency.py`
 - `src/open_llm_auth/auth/manager.py`
-- `src/open_llm_auth/providers/openbulma.py`
+- `src/open_llm_auth/providers/agent_bridge.py`
 - `src/open_llm_auth/config.py`

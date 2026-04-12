@@ -3,7 +3,7 @@
 This module serves two related protocol surfaces:
 - an OpenAI-compatible chat/models shim for drop-in clients
 - a universal/task API that preserves richer lifecycle semantics such as
-  durable ownership, idempotency, wait semantics, and OpenBulma contract checks
+  durable ownership, idempotency, wait semantics, and Agent Bridge contract checks
 """
 
 from __future__ import annotations
@@ -20,7 +20,7 @@ from fastapi.responses import JSONResponse, StreamingResponse
 
 from ..auth.manager import ProviderManager, ResolvedProvider
 from ..config import load_config
-from ..providers import OpenBulmaProvider
+from ..providers import AgentBridgeProvider
 from .auth import Principal, require_scopes, verify_server_token
 from .durable_state import (
     DurableIdempotencyToken,
@@ -299,7 +299,7 @@ def _owner_error_status(payload: Dict[str, Any]) -> int:
 
 
 async def _enforce_mutating_task_contract(
-    adapter: OpenBulmaProvider,
+    adapter: AgentBridgeProvider,
 ) -> Optional[Dict[str, Any]]:
     cfg = load_config()
     decision = await evaluate_task_contract(provider=adapter, cfg=cfg)
@@ -524,20 +524,20 @@ def _record_usage(
         logging.debug("Failed to record usage", exc_info=True)
 
 
-def _resolve_openbulma_provider(
+def _resolve_agent_bridge_provider(
     *,
     provider: str,
     preferred_profile: Optional[str],
-) -> tuple[ResolvedProvider, OpenBulmaProvider]:
-    normalized = (provider or "").strip().lower() or "openbulma"
-    if normalized not in {"openbulma", "agent"}:
+) -> tuple[ResolvedProvider, AgentBridgeProvider]:
+    normalized = (provider or "").strip().lower() or "agent_bridge"
+    if normalized not in {"agent_bridge", "agent"}:
         raise ValueError(
             f"Provider '{provider}' is not supported for universal task lifecycle routes."
         )
 
     resolved = manager.resolve(f"{normalized}/assistant", preferred_profile=preferred_profile)
     provider_instance = resolved.provider
-    if not isinstance(provider_instance, OpenBulmaProvider):
+    if not isinstance(provider_instance, AgentBridgeProvider):
         raise ValueError(
             f"Provider '{resolved.provider_id}' does not support universal task lifecycle operations."
     )
@@ -899,7 +899,7 @@ async def universal_task_create(
     x_idempotency_key: Optional[str] = Header(default=None, alias="Idempotency-Key"),
     principal: Principal = Depends(verify_server_token),
 ):
-    """Create a task against an OpenBulma-compatible runtime with durable guards."""
+    """Create a task against an Agent Bridge-compatible runtime with durable guards."""
     denied = _enforce_scope(principal, "write")
     if denied is not None:
         return _json_response(status_code=403, content=denied)
@@ -929,7 +929,7 @@ async def universal_task_create(
 
     preferred_profile = (request.auth_profile or x_auth_profile or "").strip() or None
     try:
-        resolved, provider = _resolve_openbulma_provider(
+        resolved, provider = _resolve_agent_bridge_provider(
             provider=request.provider,
             preferred_profile=preferred_profile,
         )
@@ -1083,7 +1083,7 @@ async def universal_task_create(
 @router.get("/universal/tasks/{task_id}")
 async def universal_task_status(
     task_id: str,
-    provider: str = "openbulma",
+    provider: str = "agent_bridge",
     auth_profile: Optional[str] = None,
     x_auth_profile: Optional[str] = Header(default=None, alias="X-Auth-Profile"),
     principal: Principal = Depends(verify_server_token),
@@ -1094,7 +1094,7 @@ async def universal_task_status(
 
     preferred_profile = (auth_profile or x_auth_profile or "").strip() or None
     try:
-        resolved, adapter = _resolve_openbulma_provider(
+        resolved, adapter = _resolve_agent_bridge_provider(
             provider=provider,
             preferred_profile=preferred_profile,
         )
@@ -1167,7 +1167,7 @@ async def universal_task_approve(
 
     preferred_profile = (request.auth_profile or x_auth_profile or "").strip() or None
     try:
-        resolved, adapter = _resolve_openbulma_provider(
+        resolved, adapter = _resolve_agent_bridge_provider(
             provider=request.provider,
             preferred_profile=preferred_profile,
         )
@@ -1343,7 +1343,7 @@ async def universal_task_retry(
 
     preferred_profile = (request.auth_profile or x_auth_profile or "").strip() or None
     try:
-        resolved, adapter = _resolve_openbulma_provider(
+        resolved, adapter = _resolve_agent_bridge_provider(
             provider=request.provider,
             preferred_profile=preferred_profile,
         )
@@ -1515,7 +1515,7 @@ async def universal_task_cancel(
 
     preferred_profile = (request.auth_profile or x_auth_profile or "").strip() or None
     try:
-        resolved, adapter = _resolve_openbulma_provider(
+        resolved, adapter = _resolve_agent_bridge_provider(
             provider=request.provider,
             preferred_profile=preferred_profile,
         )
@@ -1664,7 +1664,7 @@ async def universal_task_cancel(
 
 @router.get("/universal/tasks", response_model=UniversalTaskListResponse)
 async def universal_task_list(
-    provider: str = "openbulma",
+    provider: str = "agent_bridge",
     auth_profile: Optional[str] = None,
     x_auth_profile: Optional[str] = Header(default=None, alias="X-Auth-Profile"),
     principal: Principal = Depends(verify_server_token),
@@ -1675,7 +1675,7 @@ async def universal_task_list(
 
     preferred_profile = (auth_profile or x_auth_profile or "").strip() or None
     try:
-        resolved, adapter = _resolve_openbulma_provider(
+        resolved, adapter = _resolve_agent_bridge_provider(
             provider=provider,
             preferred_profile=preferred_profile,
         )
@@ -1747,7 +1747,7 @@ async def universal_task_list(
 async def universal_task_events(
     task_id: str,
     limit: int = 200,
-    provider: str = "openbulma",
+    provider: str = "agent_bridge",
     auth_profile: Optional[str] = None,
     x_auth_profile: Optional[str] = Header(default=None, alias="X-Auth-Profile"),
     principal: Principal = Depends(verify_server_token),
@@ -1758,7 +1758,7 @@ async def universal_task_events(
 
     preferred_profile = (auth_profile or x_auth_profile or "").strip() or None
     try:
-        resolved, adapter = _resolve_openbulma_provider(
+        resolved, adapter = _resolve_agent_bridge_provider(
             provider=provider,
             preferred_profile=preferred_profile,
         )
@@ -1830,7 +1830,7 @@ async def universal_task_wait(
     poll_ms = max(200, min(5000, int(request.poll_ms)))
 
     try:
-        resolved, adapter = _resolve_openbulma_provider(
+        resolved, adapter = _resolve_agent_bridge_provider(
             provider=request.provider,
             preferred_profile=preferred_profile,
         )
@@ -2128,7 +2128,7 @@ async def list_models(principal: Principal = Depends(verify_server_token)) -> Mo
 
 @router.get("/universal/contract/status")
 async def universal_contract_status(
-    provider: str = "openbulma",
+    provider: str = "agent_bridge",
     auth_profile: Optional[str] = None,
     x_auth_profile: Optional[str] = Header(default=None, alias="X-Auth-Profile"),
     principal: Principal = Depends(verify_server_token),
@@ -2139,7 +2139,7 @@ async def universal_contract_status(
 
     preferred_profile = (auth_profile or x_auth_profile or "").strip() or None
     try:
-        resolved, adapter = _resolve_openbulma_provider(
+        resolved, adapter = _resolve_agent_bridge_provider(
             provider=provider,
             preferred_profile=preferred_profile,
         )

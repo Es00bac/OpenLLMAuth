@@ -23,9 +23,9 @@ Core subsystems:
 - `config.py`: persisted config model at `~/.open_llm_auth/config.json`
 - `provider_catalog.py`: builtin provider/model catalog plus provider aliases and env-var lookup rules
 - `server/auth.py`: bearer-token verification and scope enforcement
-- `server/task_contract.py`: OpenBulma task-contract compatibility checks
+- `server/task_contract.py`: Agent Bridge task-contract compatibility checks
 - `server/idempotency.py` and `server/durable_state.py`: in-memory and SQLite-backed idempotency/ownership primitives
-- `providers/openbulma.py`: bridge to OpenBulma chat and task lifecycle endpoints
+- `providers/agent_bridge.py`: bridge to Agent Bridge chat and task lifecycle endpoints
 
 ## Installation
 
@@ -177,19 +177,19 @@ Important resolution behavior:
 - provider aliases are normalized, for example `chatgpt -> openai-codex`, `codex -> openai-codex`, `bedrock -> amazon-bedrock`
 - bare model IDs are inferred only when there is a unique match or a small heuristic fallback
 - local backends such as `ollama`, `vllm`, and `amazon-bedrock` do not self-activate just because they exist in the catalog; they still need explicit config or usable credentials
-- `openbulma` and `agent` are manager-defined local bridges, not entries in the builtin provider map
+- `agent_bridge` and `agent` are manager-defined local bridges, not entries in the builtin provider map
 
-## OpenBulma Bridge
+## Agent Bridge Bridge
 
-The OpenBulma adapter is more than a simple proxy.
+The Agent Bridge adapter is more than a simple proxy.
 
-Current behavior from `src/open_llm_auth/providers/openbulma.py`:
+Current behavior from `src/open_llm_auth/providers/agent_bridge.py`:
 - base URL defaults to `http://127.0.0.1:20100/v1`
 - standard chat requests call `POST /chat`
-- task creation/status/retry/approve/cancel/list/events use the OpenBulma agent lifecycle endpoints
+- task creation/status/retry/approve/cancel/list/events use the Agent Bridge agent lifecycle endpoints
 - mutating task operations attach contract headers such as `X-Provider-Contract-Version`
 - streaming task output is synthesized by polling task snapshots and task events and converting them into OpenAI-style SSE chunks
-- plain chat requests rebuild a bounded context block from recent transcript turns because OpenBulma's direct chat API is single-turn
+- plain chat requests rebuild a bounded context block from recent transcript turns because Agent Bridge's direct chat API is single-turn
 
 ## Security/Resilience Features
 
@@ -199,7 +199,7 @@ Implemented hardening that the older README did not describe:
 - egress policy with allow-local-provider exceptions and metadata-address denial
 - durable task ownership checks for universal task routes
 - durable idempotency keys for task mutations
-- task-contract validation against OpenBulma before mutating task routes
+- task-contract validation against Agent Bridge before mutating task routes
 - sanitized upstream HTTP errors
 - secret redaction in config responses
 
@@ -211,7 +211,7 @@ Important coverage areas:
 - `tests/test_universal_gateway.py`
 - `tests/test_gateway_security_hardening.py`
 - `tests/test_provider_manager.py`
-- `tests/test_openbulma_provider.py`
+- `tests/test_agent_bridge_provider.py`
 - `tests/test_bedrock_provider.py`
 - `tests/test_anthropic_adapter.py`
 - `tests/test_auth_manager_parsing.py`

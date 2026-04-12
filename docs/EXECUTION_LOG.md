@@ -15,7 +15,7 @@ This log is maintained as a step-by-step checklist of all implementation actions
 - [x] Added universal endpoint (`POST /v1/universal`) with canonical response envelope.
 - [x] Refactored OpenAI chat route to share the same core execution path.
 - [x] Added native universal task lifecycle routes (create/status/approve/retry/cancel).
-- [x] Extended OpenBulma provider adapter with explicit task lifecycle methods.
+- [x] Extended Agent Bridge provider adapter with explicit task lifecycle methods.
 - [x] Ran automated tests (24 passed) and manual multi-process smoke tests.
 - [x] Synced duplicate source tree under `src/src/open_llm_auth`.
 
@@ -66,12 +66,12 @@ This log is maintained as a step-by-step checklist of all implementation actions
 - [x] Add `GET /v1/universal/tasks` route.
 - [x] Add `GET /v1/universal/tasks/{task_id}/events` route.
 - [x] Add `POST /v1/universal/tasks/{task_id}/wait` route with bounded timeout/poll.
-- [x] Extend OpenBulma provider for list/events helpers.
+- [x] Extend Agent Bridge provider for list/events helpers.
 - [x] Add/extend tests for success/error/timeout/auth.
 - [x] Run targeted tests and manual smoke.
 - [x] Sync duplicate source tree and finalize.
 - [x] Added universal task observability models (`list/events/wait`).
-- [x] Added OpenBulma provider helpers for task listing and task event retrieval.
+- [x] Added Agent Bridge provider helpers for task listing and task event retrieval.
 - [x] Added routes for `GET /v1/universal/tasks`, `GET /v1/universal/tasks/{task_id}/events`, `POST /v1/universal/tasks/{task_id}/wait` with bounded timeout/poll.
 - [x] Added/updated tests for list/events/wait and auth enforcement.
 - [x] Run targeted automated tests and fix issues.
@@ -231,17 +231,17 @@ This log is maintained as a step-by-step checklist of all implementation actions
 ## 2026-03-07 - Buffered Iteration 2: Gateway-Provider Contract Handshake (Completed)
 - [x] Logged and validated multi-round expert discussion:
   - `docs/ROUNDTABLE_DISCUSSION_LOG_STEP2.md`
-- [x] Added OpenBulma contract endpoint in `openbulma-v4`:
+- [x] Added Agent Bridge contract endpoint in `agent_bridge-v4`:
   - `GET /v1/agent/contract` in `src/integration/IntegrationHub.ts`
 - [x] Added gateway-side contract fetch support:
-  - `get_task_contract()` in `src/open_llm_auth/providers/openbulma.py`
+  - `get_task_contract()` in `src/open_llm_auth/providers/agent_bridge.py`
 - [x] Added contract config and checker in gateway:
   - `taskContract` config in `src/open_llm_auth/config.py`
   - cache/check module `src/open_llm_auth/server/task_contract.py`
 - [x] Enforced contract checks for mutating universal task routes in `src/open_llm_auth/server/routes.py`.
 - [x] Ran tests with real results:
   - `open_llm_auth`: `37 passed`
-  - `openbulma-v4`: lifecycle test passed + `npm run check` passed.
+  - `agent_bridge-v4`: lifecycle test passed + `npm run check` passed.
 
 ## 2026-03-07 - Buffered Iteration 3: Contract Diagnostics (Completed)
 - [x] Logged and validated multi-round expert discussion:
@@ -256,50 +256,50 @@ This log is maintained as a step-by-step checklist of all implementation actions
 ## 2026-03-07 - Buffered Iteration 4: Outbound Contract Headers (Completed)
 - [x] Logged and validated multi-round expert discussion:
   - `docs/ROUNDTABLE_DISCUSSION_LOG_STEP4.md`
-- [x] Added gateway outbound headers for mutating OpenBulma operations:
+- [x] Added gateway outbound headers for mutating Agent Bridge operations:
   - `X-Provider-Contract-Version`
   - `X-Gateway-Version`
   - `X-Request-Id`
-  - implemented in `src/open_llm_auth/providers/openbulma.py`
+  - implemented in `src/open_llm_auth/providers/agent_bridge.py`
 - [x] Added provider header test:
-  - `tests/test_openbulma_provider.py`
+  - `tests/test_agent_bridge_provider.py`
 - [x] Ran tests with real results:
   - `open_llm_auth`: `39 passed`.
 
-## 2026-03-07 - Buffered Iteration 5: OpenBulma Contract Header Validation (Completed)
+## 2026-03-07 - Buffered Iteration 5: Agent Bridge Contract Header Validation (Completed)
 - [x] Logged and validated multi-round expert discussion:
   - `docs/ROUNDTABLE_DISCUSSION_LOG_STEP5.md`
-- [x] Added OpenBulma-side configurable policy for provider contract headers:
+- [x] Added Agent Bridge-side configurable policy for provider contract headers:
   - `taskContractHeaderPolicy` (`off|monitor|enforce`)
   - config/env wiring in:
-    - `openbulma-v4/src/config/AppConfig.ts`
-    - `openbulma-v4/src/config/RuntimeConfigManager.ts`
-    - `openbulma-v4/src/index.ts`
+    - `agent_bridge-v4/src/config/AppConfig.ts`
+    - `agent_bridge-v4/src/config/RuntimeConfigManager.ts`
+    - `agent_bridge-v4/src/index.ts`
 - [x] Added route-level validation for mutating task endpoints in:
-  - `openbulma-v4/src/integration/IntegrationHub.ts`
+  - `agent_bridge-v4/src/integration/IntegrationHub.ts`
   - endpoints: `runTask`, `cancel`, `retry`, `approve`
 - [x] Added/updated tests:
-  - `openbulma-v4/tests/integration-hub-lifecycle.test.ts`
-  - `openbulma-v4/tests/runtime-config-manager.test.ts`
-  - `openbulma-v4/tests/dashboard-endpoints.test.ts`
-  - `openbulma-v4/tests/governance-and-somatic-endpoints.test.ts`
+  - `agent_bridge-v4/tests/integration-hub-lifecycle.test.ts`
+  - `agent_bridge-v4/tests/runtime-config-manager.test.ts`
+  - `agent_bridge-v4/tests/dashboard-endpoints.test.ts`
+  - `agent_bridge-v4/tests/governance-and-somatic-endpoints.test.ts`
 - [x] Ran tests with real results:
   - `npm run test -- tests/integration-hub-lifecycle.test.ts tests/runtime-config-manager.test.ts tests/dashboard-endpoints.test.ts tests/governance-and-somatic-endpoints.test.ts` -> `8 passed`
   - `npm run check` -> passed
   - re-run focused suite: `npm run test -- tests/integration-hub-lifecycle.test.ts tests/runtime-config-manager.test.ts` -> `6 passed`
 
-## 2026-03-07 - Buffered Iteration 6: OpenBulma Contract Header Diagnostics (Completed)
+## 2026-03-07 - Buffered Iteration 6: Agent Bridge Contract Header Diagnostics (Completed)
 - [x] Logged and validated multi-round expert discussion:
   - `docs/ROUNDTABLE_DISCUSSION_LOG_STEP6.md`
-- [x] Added OpenBulma diagnostics model and counters for contract-header checks:
+- [x] Added Agent Bridge diagnostics model and counters for contract-header checks:
   - totals (`ok/missing/mismatch`)
   - per-operation counters (`create/approve/retry/cancel`)
   - `lastFailure` sample with timestamp
-  - implemented in `openbulma-v4/src/integration/IntegrationHub.ts`
+  - implemented in `agent_bridge-v4/src/integration/IntegrationHub.ts`
 - [x] Added new read-only diagnostics endpoint:
   - `GET /v1/agent/contract-header/status`
 - [x] Added lifecycle test coverage:
-  - `openbulma-v4/tests/integration-hub-lifecycle.test.ts`
+  - `agent_bridge-v4/tests/integration-hub-lifecycle.test.ts`
   - verifies endpoint payload and counter updates after `ok`, `missing`, and `mismatch` calls.
 - [x] Ran tests with real results:
   - `npm run test -- tests/integration-hub-lifecycle.test.ts` -> `6 passed`
@@ -308,31 +308,31 @@ This log is maintained as a step-by-step checklist of all implementation actions
   - `src/src/open_llm_auth/config.py`
   - `src/src/open_llm_auth/server/routes.py`
   - `src/src/open_llm_auth/server/task_contract.py`
-  - `src/src/open_llm_auth/providers/openbulma.py`
+  - `src/src/open_llm_auth/providers/agent_bridge.py`
 - [x] Process state advanced to `reported`; buffered approval queue is now exhausted.
 
-## 2026-03-07 - Step 7: Real Bulma Usability Harness (Completed)
+## 2026-03-07 - Step 7: Real Agent Usability Harness (Completed)
 - [x] Ran fresh 9-persona roundtable and validated transcript:
   - `docs/ROUNDTABLE_DISCUSSION_LOG_STEP7.md`
-- [x] Convergence decision: run real Bulma API scenario harness now, then use results for next roundtable.
+- [x] Convergence decision: run real Agent API scenario harness now, then use results for next roundtable.
 - [x] Added reusable harness script:
-  - `openbulma-v4/scripts/run-bulma-usability-harness.ts`
+  - `agent_bridge-v4/scripts/run-agent-usability-harness.ts`
 - [x] Added npm command:
-  - `openbulma-v4/package.json` -> `test:bulma-usability`
+  - `agent_bridge-v4/package.json` -> `test:agent-usability`
 - [x] Harness behavior implemented:
   - seeds memory facts via `/v1/memory/ingest`
   - runs cross-domain chat scenarios via `/v1/chat`
   - runs memory probes via `/v1/memory/retrieve` + `/v1/chat`
-  - writes markdown + JSON reports under `openbulma-v4/docs/`
+  - writes markdown + JSON reports under `agent_bridge-v4/docs/`
 - [x] Executed live harness against running stack:
-  - command: `npm run test:bulma-usability`
+  - command: `npm run test:agent-usability`
   - results:
     - scenario pass: `6/7` (`85.7%`)
     - memory pass: `0/3` (`0.0%`)
     - overall: `FAIL`
   - reports:
-    - `openbulma-v4/docs/BULMA_USABILITY_TEST_REPORT_2026-03-07T05-23-38.457Z.md`
-    - `openbulma-v4/docs/BULMA_USABILITY_TEST_REPORT_2026-03-07T05-23-38.457Z.json`
+    - `agent_bridge-v4/docs/AGENT_USABILITY_TEST_REPORT_2026-03-07T05-23-38.457Z.md`
+    - `agent_bridge-v4/docs/AGENT_USABILITY_TEST_REPORT_2026-03-07T05-23-38.457Z.json`
 - [x] Ran type-check after harness changes:
   - `npm run check` -> passed.
 
@@ -340,17 +340,17 @@ This log is maintained as a step-by-step checklist of all implementation actions
 - [x] Ran fresh 9-persona roundtable and validated transcript:
   - `docs/ROUNDTABLE_DISCUSSION_LOG_STEP8.md`
 - [x] Convergence decision: targeted `IntegrationHub` memory-context refinement with no API contract changes.
-- [x] Implemented memory retrieval tuning in `openbulma-v4/src/integration/IntegrationHub.ts`:
+- [x] Implemented memory retrieval tuning in `agent_bridge-v4/src/integration/IntegrationHub.ts`:
   - filtered noisy proper-noun anchors (question words like `what/when/where/...`)
   - replaced weak-retrieval lexical fallback with scored anchor-overlap fallback (less brittle than `tokens.every(...)`)
   - preserved bounded runtime behavior and existing endpoint contracts.
 - [x] Type-check after patch:
   - `npm run check` -> passed.
 - [x] Re-ran live usability harness:
-  - command: `npm run test:bulma-usability`
+  - command: `npm run test:agent-usability`
   - result report artifacts:
-    - `openbulma-v4/docs/BULMA_USABILITY_TEST_REPORT_2026-03-07T05-35-05.295Z.md`
-    - `openbulma-v4/docs/BULMA_USABILITY_TEST_REPORT_2026-03-07T05-35-05.295Z.json`
+    - `agent_bridge-v4/docs/AGENT_USABILITY_TEST_REPORT_2026-03-07T05-35-05.295Z.md`
+    - `agent_bridge-v4/docs/AGENT_USABILITY_TEST_REPORT_2026-03-07T05-35-05.295Z.json`
   - measured outcome:
     - scenario pass improved to `7/7` (`100.0%`)
     - memory probes remained `0/3` (`0.0%`)
@@ -360,28 +360,28 @@ This log is maintained as a step-by-step checklist of all implementation actions
 ## 2026-03-07 - Step 9: Retrieval Hardening + Stable Harness Validation (Completed)
 - [x] Ran fresh 9-persona roundtable and validated transcript:
   - `docs/ROUNDTABLE_DISCUSSION_LOG_STEP9.md`
-- [x] Implemented `MemoryFabric` retrieval tuning in `openbulma-v4/src/memory/MemoryFabric.ts`:
+- [x] Implemented `MemoryFabric` retrieval tuning in `agent_bridge-v4/src/memory/MemoryFabric.ts`:
   - stronger personal-recall weighting (higher recency/keyword, lower source dominance),
   - stricter penalties for artifact sources during personal recall (workspace tests, question-echo chat),
   - improved strong-anchor extraction to include 4-letter proper nouns (for names like `Alex`),
   - improved ephemeral chat promotion guard to reject question-echo memories.
-- [x] Implemented `IntegrationHub` retrieval/context hardening in `openbulma-v4/src/integration/IntegrationHub.ts`:
+- [x] Implemented `IntegrationHub` retrieval/context hardening in `agent_bridge-v4/src/integration/IntegrationHub.ts`:
   - widened memory-grounding detection for personal recall questions,
   - broadened memory-gap detection phrases for fallback activation,
   - personal-recall-aware memory context ranking/filtering,
   - ingest-side identity/salience defaults for inferred identity memories,
   - `/v1/memory/retrieve` lexical fallback merge before rerank.
 - [x] Updated harness seeding for deterministic identity recall tests:
-  - `openbulma-v4/scripts/run-bulma-usability-harness.ts`
+  - `agent_bridge-v4/scripts/run-agent-usability-harness.ts`
   - seeds now include explicit `identityCore: true`, high salience, and identity seed metadata.
 - [x] Resolved runtime reliability issue during testing:
   - switched from watch-mode runtime restarts to clean `build + start` runtime for stable evidence collection.
 - [x] Ran validation commands:
   - `npm run check` (multiple runs) -> passed
   - `npm run build` -> passed
-- [x] Ran live harness against updated runtime (`OPENBULMA_URL=http://127.0.0.1:20110`) with real artifacts:
-  - interim run: `openbulma-v4/docs/BULMA_USABILITY_TEST_REPORT_2026-03-07T06-31-31.968Z.md` (`scenario 6/7`, `memory 1/3`, `overall FAIL`)
-  - final run: `openbulma-v4/docs/BULMA_USABILITY_TEST_REPORT_2026-03-07T06-39-29.913Z.md` (`scenario 6/7`, `memory 2/3`, `overall PASS`)
+- [x] Ran live harness against updated runtime (`AGENT_BRIDGE_URL=http://127.0.0.1:20110`) with real artifacts:
+  - interim run: `agent_bridge-v4/docs/AGENT_USABILITY_TEST_REPORT_2026-03-07T06-31-31.968Z.md` (`scenario 6/7`, `memory 1/3`, `overall FAIL`)
+  - final run: `agent_bridge-v4/docs/AGENT_USABILITY_TEST_REPORT_2026-03-07T06-39-29.913Z.md` (`scenario 6/7`, `memory 2/3`, `overall PASS`)
 - [x] Advanced human-loop guard state for Step 9:
   - `implementation_started -> tests_passed -> reported`
 
@@ -389,24 +389,24 @@ This log is maintained as a step-by-step checklist of all implementation actions
 - [x] Ran and logged Step 10 roundtable discussion with 9 personas:
   - `docs/ROUNDTABLE_DISCUSSION_LOG_STEP10.md`
 - [x] Validated Step 10 transcript with process guard and advanced state to implementation.
-- [x] Expanded usability harness in `openbulma-v4/scripts/run-bulma-usability-harness.ts`:
-  - added repeated measured runs (`BULMA_HARNESS_RUNS`) + optional warmups (`BULMA_HARNESS_WARMUP_RUNS`)
-  - added extended memory suite mode (`BULMA_HARNESS_MEMORY_SUITE=extended`) with 12 memory probes
+- [x] Expanded usability harness in `agent_bridge-v4/scripts/run-agent-usability-harness.ts`:
+  - added repeated measured runs (`AGENT_HARNESS_RUNS`) + optional warmups (`AGENT_HARNESS_WARMUP_RUNS`)
+  - added extended memory suite mode (`AGENT_HARNESS_MEMORY_SUITE=extended`) with 12 memory probes
   - added aggregate reporting across runs (run summary + per-scenario/per-probe pass rates + match/latency averages)
   - added stronger harness seed set (MemoryTag anchors + broader project/process/user facts)
 - [x] Ran expanded baseline against active legacy runtime (`:20100`) to establish failure map:
-  - `openbulma-v4/docs/BULMA_USABILITY_TEST_REPORT_2026-03-07T07-22-49.988Z.md`
+  - `agent_bridge-v4/docs/AGENT_USABILITY_TEST_REPORT_2026-03-07T07-22-49.988Z.md`
   - aggregate: scenario `85.7%`, memory `37.5%`, overall `FAIL`
-- [x] Applied non-destructive retrieval/chat tuning in `openbulma-v4/src/integration/IntegrationHub.ts`:
+- [x] Applied non-destructive retrieval/chat tuning in `agent_bridge-v4/src/integration/IntegrationHub.ts`:
   - conditional BAA tool exposure only when dispatch intent is true (reduced accidental delegation)
   - stronger forced memory-grounded fallback for explicit recall/personal-recall misses
   - explicit source preference/penalty in fallback ranking (prefer harness seed for explicit MemoryTag lookups)
   - expanded personal-recall intent detection to include process/MemoryTag recall queries
-- [x] Rebuilt runtime (`npm run check`, `npm run build`) and re-tested on clean state runtime (`STATE_DIR=/tmp/openbulma_step10_state_clean`, `PORT=20110`).
+- [x] Rebuilt runtime (`npm run check`, `npm run build`) and re-tested on clean state runtime (`STATE_DIR=/tmp/agent_bridge_step10_state_clean`, `PORT=20110`).
 - [x] Ran repeated extended suites after tuning:
-  - `openbulma-v4/docs/BULMA_USABILITY_TEST_REPORT_2026-03-07T08-00-20.843Z.md`
+  - `agent_bridge-v4/docs/AGENT_USABILITY_TEST_REPORT_2026-03-07T08-00-20.843Z.md`
     - scenario `92.9%`, memory `75.0%`, overall `PASS`
-  - `openbulma-v4/docs/BULMA_USABILITY_TEST_REPORT_2026-03-07T08-21-07.795Z.md` (clean-state verification)
+  - `agent_bridge-v4/docs/AGENT_USABILITY_TEST_REPORT_2026-03-07T08-21-07.795Z.md` (clean-state verification)
     - scenario `100.0%` (14/14), memory `79.2%` (19/24), passing runs `2/2`, overall `PASS`
 - [x] Advanced human-loop guard state for Step 10:
   - `implementation_started -> tests_passed -> reported`
@@ -414,43 +414,43 @@ This log is maintained as a step-by-step checklist of all implementation actions
 ## 2026-03-07 - Step 11: Evidence-Coverage + Anti-Hallucination Harness (Completed)
 - [x] Completed implementation-time consult with all 9 personas (from `project_audit/expertise_analysis.md`) and logged addendum in:
   - `docs/ROUNDTABLE_DISCUSSION_LOG_STEP11.md`
-- [x] Patched `openbulma-v4/src/integration/IntegrationHub.ts` for stricter recall correctness:
+- [x] Patched `agent_bridge-v4/src/integration/IntegrationHub.ts` for stricter recall correctness:
   - added explicit MemoryTag extraction (`extractExplicitMemoryTag`)
   - gated fallback forcing on exact tag evidence (`M9`/`M99` style matching)
   - added abstain fallback when evidence is insufficient instead of fabricating
   - filtered/penalized noisy sources in recall paths:
     - `memory:association`
-    - `workspace:docs/BULMA_USABILITY_TEST_REPORT_*`
-    - `workspace:scripts/run-bulma-usability-harness.ts`
+    - `workspace:docs/AGENT_USABILITY_TEST_REPORT_*`
+    - `workspace:scripts/run-agent-usability-harness.ts`
     - `foundation:recent-chat` (for recall/fallback loops)
   - skipped turn-association ingest for explicit-tag/personal-recall queries to reduce contamination
   - strengthened source reliability mapping (`harness:seed:*` high, noisy artifacts low)
-- [x] Patched `openbulma-v4/scripts/run-bulma-usability-harness.ts`:
+- [x] Patched `agent_bridge-v4/scripts/run-agent-usability-harness.ts`:
   - added anti-hallucination abstain probes:
     - `abstain-unknown-memorytag`
     - `abstain-unknown-hostname`
     - `abstain-secret-injection`
   - expanded abstain marker detection and forbidden-pattern checks
   - added focused execution controls for repeatable rapid validation:
-    - `BULMA_HARNESS_SCENARIOS=none|all`
-    - `BULMA_HARNESS_PROBE_IDS=<csv>`
+    - `AGENT_HARNESS_SCENARIOS=none|all`
+    - `AGENT_HARNESS_PROBE_IDS=<csv>`
   - ensured aggregate logic handles scenario-disabled mode cleanly
 - [x] Ran validation:
-  - `cd /mnt/xtra/openbulma-v4 && npm run check` -> passed
-  - `cd /mnt/xtra/openbulma-v4 && npm run build` -> passed
+  - `cd /mnt/xtra/agent_bridge-v4 && npm run check` -> passed
+  - `cd /mnt/xtra/agent_bridge-v4 && npm run build` -> passed
 - [x] Test runtime hardening actions:
   - observed `postgres-qdrant` startup instability for isolated step runtime (`:20110`)
   - switched to isolated `file` backend runtime for deterministic Step 11 probe validation:
-    - `STATE_DIR=/tmp/openbulma_step11_state_file`
+    - `STATE_DIR=/tmp/agent_bridge_step11_state_file`
     - `PORT=20111`
     - `MEMORY_BACKEND=file`
 - [x] Executed repeated focused live harness runs (actual results):
   - command:
-    - `OPENBULMA_URL=http://127.0.0.1:20111 BULMA_HARNESS_SCENARIOS=none BULMA_HARNESS_PROBE_IDS=schedule-boundary,assistant-scope,anchor-memory-m9,abstain-unknown-memorytag,abstain-unknown-hostname,abstain-secret-injection BULMA_HARNESS_RUNS=2 BULMA_HARNESS_MEMORY_SUITE=extended BULMA_HARNESS_REQUIRED_PASSING_RUNS=2 BULMA_HARNESS_TIMEOUT_MS=70000 BULMA_HARNESS_STRICT_CONTRACT=1 npm run test:bulma-usability`
+    - `AGENT_BRIDGE_URL=http://127.0.0.1:20111 AGENT_HARNESS_SCENARIOS=none AGENT_HARNESS_PROBE_IDS=schedule-boundary,assistant-scope,anchor-memory-m9,abstain-unknown-memorytag,abstain-unknown-hostname,abstain-secret-injection AGENT_HARNESS_RUNS=2 AGENT_HARNESS_MEMORY_SUITE=extended AGENT_HARNESS_REQUIRED_PASSING_RUNS=2 AGENT_HARNESS_TIMEOUT_MS=70000 AGENT_HARNESS_STRICT_CONTRACT=1 npm run test:agent-usability`
   - iterative artifacts:
-    - `openbulma-v4/docs/BULMA_USABILITY_TEST_REPORT_2026-03-07T18-12-38.871Z.md` (initial focused run, FAIL)
-    - `openbulma-v4/docs/BULMA_USABILITY_TEST_REPORT_2026-03-07T18-15-18.865Z.md` (post-filter tuning, FAIL)
-    - `openbulma-v4/docs/BULMA_USABILITY_TEST_REPORT_2026-03-07T18-19-59.935Z.md` (final focused run, PASS)
+    - `agent_bridge-v4/docs/AGENT_USABILITY_TEST_REPORT_2026-03-07T18-12-38.871Z.md` (initial focused run, FAIL)
+    - `agent_bridge-v4/docs/AGENT_USABILITY_TEST_REPORT_2026-03-07T18-15-18.865Z.md` (post-filter tuning, FAIL)
+    - `agent_bridge-v4/docs/AGENT_USABILITY_TEST_REPORT_2026-03-07T18-19-59.935Z.md` (final focused run, PASS)
   - final measured outcome:
     - passing runs: `2/2` (required `2`)
     - memory pass: `8/12` (`66.7%`)
@@ -468,8 +468,8 @@ This log is maintained as a step-by-step checklist of all implementation actions
   - `python tools/human_loop_guard.py validate-discussion docs/ROUNDTABLE_DISCUSSION_LOG_STEP12.md`
 - [x] Presented step card and proceeded with explicit approval (`"sure"`).
 - [x] Implemented dedicated diagnostic runner:
-  - `openbulma-v4/scripts/run-memory-ab-diagnostic.ts`
-  - npm command: `openbulma-v4/package.json` -> `test:memory-ab`
+  - `agent_bridge-v4/scripts/run-memory-ab-diagnostic.ts`
+  - npm command: `agent_bridge-v4/package.json` -> `test:memory-ab`
 - [x] Diagnostic design implemented:
   - probes: `schedule-boundary`, `assistant-scope`
   - condition `A`: normal `/v1/chat` query path
@@ -480,14 +480,14 @@ This log is maintained as a step-by-step checklist of all implementation actions
     - `<5pp` capability bottleneck
     - else mixed
 - [x] Ran validation:
-  - `cd /mnt/xtra/openbulma-v4 && npm run check` -> passed
-  - `cd /mnt/xtra/openbulma-v4 && npm run build` -> passed
+  - `cd /mnt/xtra/agent_bridge-v4 && npm run check` -> passed
+  - `cd /mnt/xtra/agent_bridge-v4 && npm run build` -> passed
 - [x] Ran live A/B diagnostic with actual results:
   - command:
-    - `OPENBULMA_URL=http://127.0.0.1:20111 BULMA_AB_RUNS=2 BULMA_HARNESS_TIMEOUT_MS=180000 npm run test:memory-ab`
+    - `AGENT_BRIDGE_URL=http://127.0.0.1:20111 AGENT_AB_RUNS=2 AGENT_HARNESS_TIMEOUT_MS=180000 npm run test:memory-ab`
   - artifact reports:
-    - `openbulma-v4/docs/BULMA_MEMORY_AB_DIAGNOSTIC_2026-03-07T19-04-50.624Z.md`
-    - `openbulma-v4/docs/BULMA_MEMORY_AB_DIAGNOSTIC_2026-03-07T19-04-50.624Z.json`
+    - `agent_bridge-v4/docs/AGENT_MEMORY_AB_DIAGNOSTIC_2026-03-07T19-04-50.624Z.md`
+    - `agent_bridge-v4/docs/AGENT_MEMORY_AB_DIAGNOSTIC_2026-03-07T19-04-50.624Z.json`
   - measured outcome:
     - `schedule-boundary`: A `0.0%` vs B `100.0%` (uplift `+100.0pp`)
     - `assistant-scope`: A `0.0%` vs B `100.0%` (uplift `+100.0pp`)
@@ -509,8 +509,8 @@ This log is maintained as a step-by-step checklist of all implementation actions
   - from `open_llm_auth/docs/HANDOFF_CLAUDE_OPUS_4_6_2026-03-07.md`
   - to `/mnt/xtra/HANDOFF_CLAUDE_OPUS_4_6_2026-03-07.md`
 - [x] Updated handoff header to explicitly state combined scope and priority:
-  - project scope = `openbulma-v4 + open_llm_auth`
-  - `openbulma-v4` is primary; `open_llm_auth` is supporting.
+  - project scope = `agent_bridge-v4 + open_llm_auth`
+  - `agent_bridge-v4` is primary; `open_llm_auth` is supporting.
 
 ## 2026-03-07 - BAA Generative Split Phase 1: Types + Routing (Completed)
 - [x] Ran 9-persona roundtable on BAA generative split proposal:
@@ -523,7 +523,7 @@ This log is maintained as a step-by-step checklist of all implementation actions
 - [x] Added `requiredPhases(): AssistantPhase[]` to `AssistantExecutionAdapter` interface.
 - [x] Added `REPAIR_PHASES` constant in `ExecutionAdapter.ts`.
 - [x] Renamed `LiveExecutionAdapter` → `LiveRepairAdapter` (file + class + all imports).
-- [x] Added `selectAdapter()` method in `BulmaAssistantAgent` to route based on `taskMode`.
+- [x] Added `selectAdapter()` method in `AgentAssistantAgent` to route based on `taskMode`.
 - [x] Refactored `runAttempt()` to use `adapter.requiredPhases()` — phases not in the set are skipped.
 - [x] Set `taskMode: 'generate'` in `IntegrationHub.handleBaaToolCall()` for user-dispatched tasks.
 - [x] Updated test file rename: `live-execution-adapter.test.ts` → `live-repair-adapter.test.ts`.
@@ -533,15 +533,15 @@ This log is maintained as a step-by-step checklist of all implementation actions
   - `npm run build` → passed
   - 3 test suites (12 tests) → all passed
 - Files changed:
-  - `openbulma-v4/src/shared/types.ts`
-  - `openbulma-v4/src/assistant/ExecutionAdapter.ts`
-  - `openbulma-v4/src/assistant/LiveRepairAdapter.ts` (renamed from LiveExecutionAdapter.ts)
-  - `openbulma-v4/src/assistant/BulmaAssistantAgent.ts`
-  - `openbulma-v4/src/integration/IntegrationHub.ts`
-  - `openbulma-v4/src/index.ts`
-  - `openbulma-v4/scripts/test-baa-website.ts`
-  - `openbulma-v4/tests/live-repair-adapter.test.ts` (renamed)
-  - `openbulma-v4/tests/bulma-assistant-agent-shutdown.test.ts`
+  - `agent_bridge-v4/src/shared/types.ts`
+  - `agent_bridge-v4/src/assistant/ExecutionAdapter.ts`
+  - `agent_bridge-v4/src/assistant/LiveRepairAdapter.ts` (renamed from LiveExecutionAdapter.ts)
+  - `agent_bridge-v4/src/assistant/AgentAssistantAgent.ts`
+  - `agent_bridge-v4/src/integration/IntegrationHub.ts`
+  - `agent_bridge-v4/src/index.ts`
+  - `agent_bridge-v4/scripts/test-baa-website.ts`
+  - `agent_bridge-v4/tests/live-repair-adapter.test.ts` (renamed)
+  - `agent_bridge-v4/tests/agent-assistant-agent-shutdown.test.ts`
 
 ## 2026-03-07 - BAA Generative Split Phase 2: LiveGenerativeAdapter
 
@@ -561,11 +561,11 @@ This log is maintained as a step-by-step checklist of all implementation actions
   - Sensitive file write auditing (*.sh, *.env, Makefile, etc.)
   - Progress callback every 5 iterations
   - `patch()` no-op, `verify()` final gate
-- [x] Wired into `index.ts`: created `LiveGenerativeAdapter` instance, passed as `generativeAdapter` to `BulmaAssistantAgent`.
+- [x] Wired into `index.ts`: created `LiveGenerativeAdapter` instance, passed as `generativeAdapter` to `AgentAssistantAgent`.
 - [x] Ran validation:
   - `npx tsc --noEmit` → passed
   - `npm run build` → passed
   - 512 tests passed, 3 pre-existing failures (task-lifecycle backward compat, unrelated)
 - Files changed:
-  - `openbulma-v4/src/assistant/LiveGenerativeAdapter.ts` (NEW)
-  - `openbulma-v4/src/index.ts`
+  - `agent_bridge-v4/src/assistant/LiveGenerativeAdapter.ts` (NEW)
+  - `agent_bridge-v4/src/index.ts`

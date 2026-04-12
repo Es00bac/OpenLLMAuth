@@ -12,7 +12,7 @@ Decision Topic: User requested deeper, repeated testing with significantly expan
 - The Security Auditor | adversarial safety + fail-closed behavior
 - The Telemetry Analyst | measurement quality, trend and variance reporting
 - The Dashboard Weaver | visibility and operator-facing report clarity
-- The Integration Ambassador | cross-project compatibility (openbulma-v4 + open_llm_auth)
+- The Integration Ambassador | cross-project compatibility (agent_bridge-v4 + open_llm_auth)
 
 ## Round 1 - Proposals
 - Euler: keep the existing harness, but add repeated measured runs and class-level memory scoring so outcomes are statistically meaningful.
@@ -46,7 +46,7 @@ Decision Topic: User requested deeper, repeated testing with significantly expan
   5. Use new expanded results to drive targeted retrieval tuning, then repeat tests.
 
 ## Step Card Presented
-- Implement harness v2 features above in `openbulma-v4/scripts/run-bulma-usability-harness.ts`.
+- Implement harness v2 features above in `agent_bridge-v4/scripts/run-agent-usability-harness.ts`.
 - Run at least 2 measured runs with extended memory suite.
 - Identify worst-performing memory probe categories and tune retrieval non-destructively.
 - Re-run and compare aggregate metrics.

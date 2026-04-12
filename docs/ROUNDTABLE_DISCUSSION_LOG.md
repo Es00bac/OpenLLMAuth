@@ -8,7 +8,7 @@ Topic: After durable persistence, choose next slice order: `B->C` or `C->B`
 ## Round 1
 - Euler | The Core Architect | Architecture/state semantics  
 Position: `C->B`  
-Note: durable state is solid now; semantic drift between gateway and OpenBulma is the next systemic reliability risk.
+Note: durable state is solid now; semantic drift between gateway and Agent Bridge is the next systemic reliability risk.
 
 - Pascal | The Auth Hacker | Gateway/protocol/auth mechanics  
 Position: `B->C`  
