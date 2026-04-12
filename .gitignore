@@ -1,0 +1,41 @@
+# Environment
+.env
+.venv/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+*.egg
+*.whl
+dist/
+build/
+
+# Node
+node_modules/
+
+# Logs / runtime
+*.log
+*.pid
+
+# OMC
+.omc/
+
+# Uv
+uv.lock
+
+# Temporary / audit scraps
+temp_openclaw/
+audit_providers.py
+audit_report.py
+test_openai_regex.py
+test_providers.py
+test_router_final.py
+
+# Packaging artifacts
+pkg/
+*.pkg.tar.zst
+*.tar.gz
+src/dist/
+src/src/

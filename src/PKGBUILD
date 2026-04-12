@@ -1,0 +1,35 @@
+# Maintainer: Gemini CLI <gemini-cli@google.com>
+pkgname=open-llm-auth
+pkgver=0.1.0
+pkgrel=1
+pkgdesc="LLM Router and Authenticator compatible with OpenAI API"
+arch=('any')
+url=""
+license=('unknown')
+depends=(
+    'python-fastapi'
+    'uvicorn'
+    'python-httpx'
+    'python-typer'
+    'python-pydantic'
+    'python-pydantic-settings'
+    'python-dotenv'
+    'python-rich'
+)
+makedepends=(
+    'python-build'
+    'python-hatchling'
+    'python-installer'
+)
+source=("${pkgname}::git+file://${PWD}")
+sha512sums=('SKIP')
+
+build() {
+	cd "$srcdir"
+	python -m build --wheel --no-isolation
+}
+
+package() {
+	cd "$srcdir"
+	python -m installer --destdir="$pkgdir" dist/*.whl
+}

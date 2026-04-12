@@ -1,0 +1,598 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Open LLM Auth - Admin Dashboard</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <script src="https://unpkg.com/htmx.org@1.9.12"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+    <style>
+        .dashboard-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 24px; }
+        .stat-card { background: rgba(10,10,16,0.8); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 18px; text-align: center; }
+        .stat-value { font-size: 24px; font-weight: 700; color: var(--neon-cyan); margin-bottom: 4px; }
+        .stat-label { font-size: 11px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 1px; }
+        .chart-container { background: rgba(10,10,16,0.8); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 18px; margin-bottom: 16px; position: relative; height: 300px; }
+        .test-result { font-size: 12px; margin-top: 8px; padding: 8px; border-radius: var(--radius-sm); background: rgba(0,0,0,0.4); }
+        .profile-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border-color); }
+        .profile-row:last-child { border-bottom: none; }
+        .htmx-indicator { display: none; }
+        .htmx-request .htmx-indicator { display: inline; }
+        .htmx-request.htmx-indicator { display: inline; }
+        .usage-list { display: grid; gap: 10px; }
+        .usage-list-item { display: flex; justify-content: space-between; gap: 12px; padding: 10px 12px; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: rgba(255,255,255,0.02); }
+        .usage-list-meta { font-size: 11px; color: var(--text-secondary); }
+        .usage-note { font-size: 12px; color: var(--text-secondary); line-height: 1.5; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Open LLM Auth</h1>
+            <p class="subtitle">Admin Dashboard - Providers, Usage & Profiles</p>
+            <div style="margin-top: 15px;">
+                <a href="/chat" class="btn btn-primary">Open Chat Interface</a>
+            </div>
+        </header>
+
+        <nav class="tabs">
+            <button class="tab-btn active" data-tab="providers">Providers</button>
+            <button class="tab-btn" data-tab="auth">Auth Profiles</button>
+            <button class="tab-btn" data-tab="models">Models</button>
+            <button class="tab-btn" data-tab="settings">Settings</button>
+            <button class="tab-btn" data-tab="usage">Usage</button>
+            <button class="tab-btn" data-tab="profiles">Profiles</button>
+        </nav>
+
+        <!-- Providers Tab -->
+        <section id="providers-tab" class="tab-content active">
+            <div class="section-header">
+                <h2>Providers</h2>
+                <button class="btn btn-primary" id="add-provider-btn">Add Custom Provider</button>
+            </div>
+            <div class="card-list" id="providers-list"><div class="loading">Loading providers...</div></div>
+        </section>
+
+        <!-- Auth Profiles Tab -->
+        <section id="auth-tab" class="tab-content">
+            <div class="section-header">
+                <h2>Authentication Profiles</h2>
+                <button class="btn btn-primary" id="add-auth-btn">Add Auth Profile</button>
+            </div>
+            <div class="card-list" id="auth-list"><div class="loading">Loading auth profiles...</div></div>
+        </section>
+
+        <!-- Models Tab -->
+        <section id="models-tab" class="tab-content">
+            <div class="section-header">
+                <h2>Available Models</h2>
+                <span class="model-count" id="model-count"></span>
+            </div>
+            <div class="model-grid" id="models-list"><div class="loading">Loading models...</div></div>
+        </section>
+
+        <!-- Settings Tab -->
+        <section id="settings-tab" class="tab-content">
+            <div class="section-header"><h2>Settings</h2></div>
+            <div class="settings-card">
+                <div class="form-group">
+                    <label for="default-provider">Default Provider</label>
+                    <select id="default-provider" class="form-control">
+                        <option value="">Select a configured provider...</option>
+                    </select>
+                    <p class="help-text">Only providers with authentication profiles are shown</p>
+                </div>
+                <div class="form-group hidden" id="model-select-group">
+                    <label for="default-model">Default Model</label>
+                    <select id="default-model" class="form-control">
+                        <option value="">Select a provider first...</option>
+                    </select>
+                </div>
+                <div class="settings-preview hidden" id="default-model-preview">
+                    <span class="preview-label">Full model reference:</span>
+                    <code id="full-model-ref" class="preview-value"></code>
+                </div>
+                <button class="btn btn-primary" id="save-settings-btn">Save Settings</button>
+            </div>
+        </section>
+
+        <!-- Usage Tab -->
+        <section id="usage-tab" class="tab-content">
+            <div class="section-header"><h2>Usage</h2></div>
+            <div class="dashboard-grid" id="usage-summary">
+                <div class="stat-card"><div class="stat-value" id="stat-requests">-</div><div class="stat-label">Requests</div></div>
+                <div class="stat-card"><div class="stat-value" id="stat-tokens">-</div><div class="stat-label">Total Tokens</div></div>
+                <div class="stat-card"><div class="stat-value" id="stat-cost">-</div><div class="stat-label">Est. Cost</div></div>
+                <div class="stat-card"><div class="stat-value" id="stat-latency">-</div><div class="stat-label">Avg Latency (ms)</div></div>
+            </div>
+            <div class="chart-container"><canvas id="usageChart"></canvas></div>
+            <div class="chart-container"><canvas id="providerChart"></canvas></div>
+            <div class="dashboard-grid">
+                <div class="stat-card">
+                    <div class="stat-label" style="margin-bottom:12px;">Models</div>
+                    <div class="usage-list" id="usage-models"></div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label" style="margin-bottom:12px;">Endpoints</div>
+                    <div class="usage-list" id="usage-endpoints"></div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label" style="margin-bottom:12px;">Sources</div>
+                    <div class="usage-list" id="usage-sources"></div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label" style="margin-bottom:12px;">Provider Telemetry</div>
+                    <div class="usage-list" id="usage-provider-telemetry"></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Profiles Tab -->
+        <section id="profiles-tab" class="tab-content" x-data="profileApp()" x-init="load()">
+            <div class="section-header">
+                <h2>Configuration Profiles</h2>
+                <button class="btn btn-primary" @click="saveCurrent()">Save Current Config</button>
+            </div>
+            <div class="settings-card">
+                <template x-if="message">
+                    <div class="toast info" style="position:static; margin-bottom:16px; animation:none;" x-text="message"></div>
+                </template>
+                <div class="form-group">
+                    <label>Import Profile</label>
+                    <div class="key-value-row">
+                        <input type="text" x-model="importName" class="form-control" placeholder="Profile name">
+                        <button class="btn btn-secondary" @click="pickFile()">Choose File</button>
+                    </div>
+                    <textarea x-model="importContent" class="form-control" rows="4" placeholder="Paste JSON config..."></textarea>
+                    <button class="btn btn-primary mt-2" @click="doImport()">Import</button>
+                    <input type="file" id="profile-file-input" style="display:none" accept=".json" @change="readFile($event)">
+                </div>
+                <h3 style="margin: 20px 0 12px; font-size: 14px; color: var(--neon-cyan); text-transform: uppercase; letter-spacing: 1px;">Saved Profiles</h3>
+                <template x-for="p in profiles" :key="p.name">
+                    <div class="profile-row">
+                        <div>
+                            <div class="card-title" x-text="p.name"></div>
+                            <div class="card-subtitle" x-text="p.created + ' (' + p.size + ' bytes)'"></div>
+                        </div>
+                        <div class="card-actions">
+                            <button class="btn btn-primary" @click="activate(p.name)">Activate</button>
+                            <button class="btn btn-secondary" @click="exportProfile(p.name)">Export</button>
+                            <button class="btn btn-danger" @click="remove(p.name)">Delete</button>
+                        </div>
+                    </div>
+                </template>
+                <div x-show="profiles.length === 0" class="empty-state" style="padding: 30px;">
+                    <p>No saved profiles yet</p>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <!-- Modals from legacy UI -->
+    <div class="modal" id="provider-modal">
+        <div class="modal-content">
+            <div class="modal-header"><h3 id="provider-modal-title">Add Provider</h3><button class="modal-close">&times;</button></div>
+            <div class="modal-body">
+                <form id="provider-form">
+                    <input type="hidden" id="provider-original-id">
+                    <div class="form-group"><label for="provider-id">Provider ID</label><input type="text" id="provider-id" class="form-control" placeholder="e.g., my-custom-provider" required></div>
+                    <div class="form-group"><label for="provider-base-url">Base URL</label><input type="url" id="provider-base-url" class="form-control" placeholder="https://api.example.com/v1"></div>
+                    <div class="form-group"><label for="provider-api">API Type</label><select id="provider-api" class="form-control"><option value="openai-completions">OpenAI Completions</option><option value="openai-responses">OpenAI Responses</option><option value="anthropic-messages">Anthropic Messages</option><option value="google-generative-ai">Google Generative AI</option><option value="bedrock-converse-stream">Bedrock Converse Stream</option><option value="ollama">Ollama</option></select></div>
+                    <div class="form-group"><label for="provider-auth">Authentication Mode</label><select id="provider-auth" class="form-control"><option value="api-key">API Key</option><option value="oauth">OAuth</option><option value="token">Token</option><option value="aws-sdk">AWS SDK</option></select></div>
+                    <div class="form-group"><label for="provider-api-key">Default API Key</label><input type="password" id="provider-api-key" class="form-control" placeholder="Leave blank to use auth profiles"></div>
+                    <div class="form-group checkbox"><label><input type="checkbox" id="provider-auth-header" checked> Send Authorization Header</label></div>
+                    <div class="form-group"><label>Custom Headers</label><div id="provider-headers" class="key-value-list"><div class="key-value-row"><input type="text" class="form-control header-key" placeholder="Header name"><input type="text" class="form-control header-value" placeholder="Header value"><button type="button" class="btn btn-icon remove-header">&minus;</button></div></div><button type="button" class="btn btn-secondary" id="add-header-btn">+ Add Header</button></div>
+                </form>
+            </div>
+            <div class="modal-footer"><button type="button" class="btn btn-secondary modal-cancel">Cancel</button><button type="button" class="btn btn-primary" id="save-provider-btn">Save Provider</button></div>
+        </div>
+    </div>
+
+    <div class="modal" id="auth-modal">
+        <div class="modal-content">
+            <div class="modal-header"><h3 id="auth-modal-title">Add Auth Profile</h3><button class="modal-close">&times;</button></div>
+            <div class="modal-body">
+                <form id="auth-form">
+                    <input type="hidden" id="auth-original-id">
+                    <div class="form-group"><label for="auth-profile-id">Profile ID</label><input type="text" id="auth-profile-id" class="form-control" placeholder="e.g., openai:personal" required><p class="help-text">Format: provider:name</p></div>
+                    <div class="form-group"><label for="auth-provider">Provider</label><select id="auth-provider" class="form-control" required><option value="">Select provider...</option></select></div>
+                    <div class="form-group"><label for="auth-type">Credential Type</label><select id="auth-type" class="form-control"><option value="api_key">API Key</option><option value="token">Token</option><option value="oauth">OAuth</option></select></div>
+                    <div class="form-group" id="auth-key-group"><label for="auth-key">API Key</label><input type="password" id="auth-key" class="form-control" placeholder="sk-..."></div>
+                    <div class="form-group hidden" id="auth-token-group"><label for="auth-token">Token</label><input type="password" id="auth-token" class="form-control"></div>
+                    <div class="form-group hidden" id="auth-oauth-group"><label for="auth-access">Access Token</label><input type="password" id="auth-access" class="form-control"><label for="auth-refresh" class="mt-2">Refresh Token (optional)</label><input type="password" id="auth-refresh" class="form-control"></div>
+                    <div class="form-group"><label for="auth-expires">Expires At (timestamp, optional)</label><input type="number" id="auth-expires" class="form-control" placeholder="Milliseconds since epoch"></div>
+                    <div class="form-group"><label for="auth-email">Email (optional)</label><input type="email" id="auth-email" class="form-control"></div>
+                    <div class="form-group"><label for="auth-base-url">Custom Base URL (optional)</label><input type="url" id="auth-base-url" class="form-control"></div>
+                </form>
+            </div>
+            <div class="modal-footer"><button type="button" class="btn btn-danger" id="delete-auth-btn">Delete</button><button type="button" class="btn btn-secondary modal-cancel">Cancel</button><button type="button" class="btn btn-primary" id="save-auth-btn">Save Profile</button></div>
+        </div>
+    </div>
+
+    <div id="toast-container"></div>
+
+    <script>
+        // ====== Legacy vanilla JS for Providers/Auth/Models/Settings ======
+        // (Retained from original app.js to preserve existing functionality)
+        const API = {
+            async request(method, path, body = null) {
+                const options = { method, headers: { 'Content-Type': 'application/json' } };
+                if (body) options.body = JSON.stringify(body);
+                const response = await fetch(path, options);
+                if (!response.ok) {
+                    const error = await response.json().catch(() => ({ error: 'Unknown error' }));
+                    throw new Error(error.detail || error.error || `HTTP ${response.status}`);
+                }
+                return response.json();
+            },
+            getConfig: () => API.request('GET', '/config'),
+            saveConfig: (config) => API.request('POST', '/config', config),
+            getProviders: () => API.request('GET', '/config/providers'),
+            saveProvider: (id, provider) => API.request('PUT', `/config/providers/${id}`, provider),
+            deleteProvider: (id) => API.request('DELETE', `/config/providers/${id}`),
+            getAuthProfiles: () => API.request('GET', '/config/auth-profiles'),
+            saveAuthProfile: (id, profile) => API.request('PUT', `/config/auth-profiles/${id}`, profile),
+            deleteAuthProfile: (id) => API.request('DELETE', `/config/auth-profiles/${id}`),
+            getModels: () => API.request('GET', '/v1/models'),
+            getBuiltinProviders: () => API.request('GET', '/config/builtin-providers'),
+            getConfiguredProviders: () => API.request('GET', '/config/configured-providers'),
+            getProviderModels: (providerId) => API.request('GET', `/config/providers/${providerId}/models`),
+        };
+
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.textContent = message;
+            container.appendChild(toast);
+            setTimeout(() => { toast.style.opacity = '0'; toast.style.transform = 'translateX(100%)'; toast.style.transition = 'all 0.3s ease'; setTimeout(() => toast.remove(), 300); }, 4000);
+        }
+
+        function openModal(modalId) { document.getElementById(modalId).classList.add('active'); }
+        function closeModal(modalId) { document.getElementById(modalId).classList.remove('active'); }
+
+        document.addEventListener('keydown', (e) => { if (e.key === 'Escape') document.querySelectorAll('.modal.active').forEach(m => m.classList.remove('active')); });
+        document.querySelectorAll('.modal').forEach(modal => modal.addEventListener('click', (e) => { if (e.target === modal) modal.classList.remove('active'); }));
+        document.querySelectorAll('.modal-close, .modal-cancel').forEach(btn => btn.addEventListener('click', () => btn.closest('.modal').classList.remove('active')));
+
+        let currentTab = 'providers';
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const tab = btn.dataset.tab;
+                currentTab = tab;
+                document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                btn.classList.add('active');
+                document.getElementById(`${tab}-tab`).classList.add('active');
+                if (tab === 'providers') loadProviders();
+                if (tab === 'auth') loadAuthProfiles();
+                if (tab === 'models') loadModels();
+                if (tab === 'settings') loadSettings();
+                if (tab === 'usage') loadUsage();
+                if (tab === 'profiles') window.dispatchEvent(new Event('profiles-refresh'));
+            });
+        });
+
+        const PROVIDER_ICONS = { 'openai': 'GPT', 'anthropic': 'Claude', 'google': 'Gemini', 'github-copilot': 'Copilot', 'amazon-bedrock': 'AWS', 'mistral': 'Mistral', 'groq': 'Groq', 'together': 'Together', 'openrouter': 'Router', 'ollama': 'Ollama', 'vllm': 'vLLM', 'huggingface': 'HF', 'azure': 'Azure', 'cohere': 'Cohere', 'ai21': 'AI21' };
+        function getProviderIcon(providerId) { const normalized = providerId.toLowerCase().replace(/[-_]/g, ''); for (const [key, icon] of Object.entries(PROVIDER_ICONS)) if (normalized.includes(key.replace(/[-_]/g, ''))) return icon; return providerId.slice(0, 2).toUpperCase(); }
+
+        async function loadProviders() {
+            const list = document.getElementById('providers-list');
+            try {
+                const [config, builtin] = await Promise.all([API.getConfig(), API.getBuiltinProviders()]);
+                const providers = [];
+                for (const [id, cfg] of Object.entries(config.providers || {})) providers.push({ id, ...cfg, isBuiltin: false });
+                for (const [id, cfg] of Object.entries(builtin)) if (!providers.find(p => p.id === id)) providers.push({ id, ...cfg, isBuiltin: true });
+                if (providers.length === 0) { list.innerHTML = `<div class="empty-state"><div class="empty-state-icon">🔌</div><p>No providers configured</p><button class="btn btn-primary mt-2" onclick="openAddProviderModal()">Add Provider</button></div>`; return; }
+                list.innerHTML = providers.map(p => `
+                    <div class="card" data-provider="${p.id}">
+                        <div class="card-icon">${getProviderIcon(p.id)}</div>
+                        <div class="card-content"><div class="card-title">${p.id}</div><div class="card-subtitle">${p.baseUrl || 'No base URL'}</div><div class="card-meta"><span>API: ${p.api || 'Not set'}</span><span>Auth: ${p.auth || 'api-key'}</span>${p.isBuiltin ? '<span class="status-badge active">Built-in</span>' : '<span class="status-badge">Custom</span>'}</div></div>
+                        <div class="card-actions">${!p.isBuiltin ? `<button class="btn btn-icon" onclick="editProvider('${p.id}')">✏️</button>` : ''}${!p.isBuiltin ? `<button class="btn btn-icon" onclick="deleteProvider('${p.id}')">🗑️</button>` : ''}</div>
+                    </div>`).join('');
+            } catch (err) { showToast(`Failed to load providers: ${err.message}`, 'error'); list.innerHTML = '<div class="empty-state">Failed to load providers</div>'; }
+        }
+
+        async function loadAuthProfiles() {
+            const list = document.getElementById('auth-list');
+            try {
+                const profiles = await API.getAuthProfiles();
+                if (profiles.length === 0) { list.innerHTML = `<div class="empty-state"><div class="empty-state-icon">🔐</div><p>No authentication profiles</p><button class="btn btn-primary mt-2" onclick="openAddAuthModal()">Add Profile</button></div>`; return; }
+                list.innerHTML = profiles.map(p => {
+                    const hasSecret = p.type === 'api_key' ? p.key : p.type === 'token' ? p.token : p.access;
+                    const isExpired = p.expires && p.expires < Date.now();
+                    return `
+                    <div class="card" data-profile="${p.id}">
+                        <div class="card-icon">🔐</div>
+                        <div class="card-content">
+                            <div class="card-title">${p.id}</div>
+                            <div class="card-subtitle">${p.provider}</div>
+                            <div class="card-meta">
+                                <span>Type: ${p.type}</span>
+                                ${hasSecret ? '<span class="status-badge active">Configured</span>' : '<span class="status-badge inactive">No secret</span>'}
+                                ${isExpired ? '<span class="status-badge expired">Expired</span>' : ''}
+                                ${p.email ? `<span>Email: ${p.email}</span>` : ''}
+                            </div>
+                            <div style="margin-top:10px;">
+                                <button class="btn btn-secondary"
+                                    hx-post="/config/credentials/${p.id}/test"
+                                    hx-target="next .test-result"
+                                    hx-swap="innerHTML"
+                                    hx-indicator="#test-spin-${p.id}">
+                                    Test Connection
+                                    <span id="test-spin-${p.id}" class="htmx-indicator" style="margin-left:6px;">⏳</span>
+                                </button>
+                                <div class="test-result" style="display:none;"></div>
+                            </div>
+                        </div>
+                        <div class="card-actions"><button class="btn btn-icon" onclick="editAuthProfile('${p.id}')">✏️</button><button class="btn btn-icon" onclick="deleteAuthProfile('${p.id}')">🗑️</button></div>
+                    </div>`;
+                }).join('');
+                htmx.process(list);
+            } catch (err) { showToast(`Failed to load auth profiles: ${err.message}`, 'error'); list.innerHTML = '<div class="empty-state">Failed to load auth profiles</div>'; }
+        }
+
+        async function loadModels() {
+            const list = document.getElementById('models-list'); const countEl = document.getElementById('model-count');
+            try {
+                const data = await API.getModels(); const models = data.data || [];
+                countEl.textContent = `${models.length} models`;
+                if (models.length === 0) { list.innerHTML = `<div class="empty-state"><div class="empty-state-icon">🤖</div><p>No models available</p></div>`; return; }
+                list.innerHTML = models.map(m => { const provider = m.id.split('/')[0] || 'unknown'; const modelName = m.id.split('/').slice(1).join('/') || m.id; return `<div class="model-card"><div class="card-title">${modelName}${m.reasoning ? '<span class="model-badge reasoning">Reasoning</span>' : ''}</div><div class="card-subtitle">${provider}</div><div class="model-capabilities">${(m.input || ['text']).map(cap => `<span class="capability">${cap}</span>`).join('')}${m.contextWindow ? `<span class="capability">${(m.contextWindow / 1000).toFixed(0)}k ctx</span>` : ''}</div></div>`; }).join('');
+            } catch (err) { showToast(`Failed to load models: ${err.message}`, 'error'); list.innerHTML = '<div class="empty-state">Failed to load models</div>'; }
+        }
+
+        async function loadSettings() {
+            try {
+                const config = await API.getConfig(); const providers = await API.getConfiguredProviders();
+                const providerSelect = document.getElementById('default-provider'); const modelSelect = document.getElementById('default-model');
+                const modelGroup = document.getElementById('model-select-group'); const preview = document.getElementById('default-model-preview');
+                providerSelect.innerHTML = '<option value="">Select a configured provider...</option>';
+                modelSelect.innerHTML = '<option value="">Select a provider first...</option>'; modelGroup.classList.add('hidden'); preview.classList.add('hidden');
+                if (providers.length === 0) { providerSelect.innerHTML = '<option value="">No configured providers found</option>'; return; }
+                const currentDefault = config.defaultModel || ''; const currentProvider = currentDefault.split('/')[0] || ''; const currentModel = currentDefault.split('/')[1] || '';
+                providerSelect.innerHTML += providers.map(p => `<option value="${p.id}" ${p.id === currentProvider ? 'selected' : ''}>${p.id} (${p.authProfileCount} profile${p.authProfileCount !== 1 ? 's' : ''})</option>`).join('');
+                if (currentProvider && providers.find(p => p.id === currentProvider)) await loadProviderModels(currentProvider, currentModel);
+            } catch (err) { showToast(`Failed to load settings: ${err.message}`, 'error'); }
+        }
+
+        async function loadProviderModels(providerId, selectedModel = '') {
+            const modelSelect = document.getElementById('default-model'); const modelGroup = document.getElementById('model-select-group'); const preview = document.getElementById('default-model-preview');
+            try {
+                modelSelect.innerHTML = '<option value="">Loading models...</option>'; modelGroup.classList.remove('hidden');
+                const models = await API.getProviderModels(providerId);
+                if (models.length === 0) { modelSelect.innerHTML = '<option value="">No models found for this provider</option>'; preview.classList.add('hidden'); return; }
+                const modelOptions = models.map(m => { const modelId = m.id; const fullRef = `${providerId}/${modelId}`; const isSelected = modelId === selectedModel || fullRef === selectedModel; return `<option value="${modelId}" ${isSelected ? 'selected' : ''}>${m.name || modelId}</option>`; }).join('');
+                modelSelect.innerHTML = `<option value="">Select a model...</option>${modelOptions}`;
+                if (selectedModel) updateModelPreview();
+            } catch (err) { showToast(`Failed to load models: ${err.message}`, 'error'); modelSelect.innerHTML = '<option value="">Error loading models</option>'; }
+        }
+
+        function updateModelPreview() {
+            const provider = document.getElementById('default-provider').value; const model = document.getElementById('default-model').value;
+            const preview = document.getElementById('default-model-preview'); const fullRefEl = document.getElementById('full-model-ref');
+            if (provider && model) { fullRefEl.textContent = `${provider}/${model}`; preview.classList.remove('hidden'); } else { preview.classList.add('hidden'); }
+        }
+        document.getElementById('default-provider').addEventListener('change', async (e) => { const providerId = e.target.value; const modelGroup = document.getElementById('model-select-group'); const preview = document.getElementById('default-model-preview'); if (!providerId) { modelGroup.classList.add('hidden'); preview.classList.add('hidden'); return; } await loadProviderModels(providerId); });
+        document.getElementById('default-model').addEventListener('change', updateModelPreview);
+
+        function openAddProviderModal() { document.getElementById('provider-form').reset(); document.getElementById('provider-original-id').value = ''; document.getElementById('provider-modal-title').textContent = 'Add Provider'; openModal('provider-modal'); }
+        async function editProvider(id) {
+            try {
+                const config = await API.getConfig(); const provider = config.providers[id]; if (!provider) { showToast('Provider not found', 'error'); return; }
+                document.getElementById('provider-original-id').value = id; document.getElementById('provider-id').value = id; document.getElementById('provider-base-url').value = provider.baseUrl || ''; document.getElementById('provider-api').value = provider.api || 'openai-completions'; document.getElementById('provider-auth').value = provider.auth || 'api-key'; document.getElementById('provider-api-key').value = provider.apiKey || ''; document.getElementById('provider-auth-header').checked = provider.authHeader !== false;
+                const headersContainer = document.getElementById('provider-headers'); headersContainer.innerHTML = '';
+                if (provider.headers && Object.keys(provider.headers).length > 0) { for (const [key, value] of Object.entries(provider.headers)) headersContainer.innerHTML += `<div class="key-value-row"><input type="text" class="form-control header-key" placeholder="Header name" value="${key}"><input type="text" class="form-control header-value" placeholder="Header value" value="${value}"><button type="button" class="btn btn-icon remove-header">&minus;</button></div>`; }
+                else { headersContainer.innerHTML = `<div class="key-value-row"><input type="text" class="form-control header-key" placeholder="Header name"><input type="text" class="form-control header-value" placeholder="Header value"><button type="button" class="btn btn-icon remove-header">&minus;</button></div>`; }
+                document.getElementById('provider-modal-title').textContent = 'Edit Provider'; openModal('provider-modal');
+            } catch (err) { showToast(`Failed to load provider: ${err.message}`, 'error'); }
+        }
+        async function deleteProvider(id) { if (!confirm(`Delete provider "${id}"?`)) return; try { await API.deleteProvider(id); showToast('Provider deleted', 'success'); loadProviders(); } catch (err) { showToast(`Failed: ${err.message}`, 'error'); } }
+        document.getElementById('add-provider-btn').addEventListener('click', openAddProviderModal);
+        document.getElementById('add-header-btn').addEventListener('click', () => { const container = document.getElementById('provider-headers'); const row = document.createElement('div'); row.className = 'key-value-row'; row.innerHTML = `<input type="text" class="form-control header-key" placeholder="Header name"><input type="text" class="form-control header-value" placeholder="Header value"><button type="button" class="btn btn-icon remove-header">&minus;</button>`; container.appendChild(row); });
+        document.getElementById('provider-headers').addEventListener('click', (e) => { if (e.target.classList.contains('remove-header')) { const rows = document.querySelectorAll('#provider-headers .key-value-row'); if (rows.length > 1) e.target.closest('.key-value-row').remove(); else e.target.closest('.key-value-row').querySelectorAll('input').forEach(input => input.value = ''); } });
+        document.getElementById('save-provider-btn').addEventListener('click', async () => {
+            const originalId = document.getElementById('provider-original-id').value; const id = document.getElementById('provider-id').value.trim(); if (!id) { showToast('Provider ID required', 'error'); return; }
+            const headers = {}; document.querySelectorAll('#provider-headers .key-value-row').forEach(row => { const key = row.querySelector('.header-key').value.trim(); const value = row.querySelector('.header-value').value.trim(); if (key) headers[key] = value; });
+            const provider = { baseUrl: document.getElementById('provider-base-url').value.trim(), api: document.getElementById('provider-api').value, auth: document.getElementById('provider-auth').value, apiKey: document.getElementById('provider-api-key').value.trim(), authHeader: document.getElementById('provider-auth-header').checked, headers };
+            try { await API.saveProvider(id, provider); if (originalId && originalId !== id) await API.deleteProvider(originalId); closeModal('provider-modal'); showToast('Provider saved', 'success'); loadProviders(); } catch (err) { showToast(`Failed: ${err.message}`, 'error'); }
+        });
+
+        function openAddAuthModal() { document.getElementById('auth-form').reset(); document.getElementById('auth-original-id').value = ''; document.getElementById('auth-modal-title').textContent = 'Add Auth Profile'; document.getElementById('delete-auth-btn').classList.add('hidden'); API.getBuiltinProviders().then(providers => { const select = document.getElementById('auth-provider'); select.innerHTML = '<option value="">Select provider...</option>' + Object.keys(providers).map(id => `<option value="${id}">${id}</option>`).join(''); }); openModal('auth-modal'); }
+        async function editAuthProfile(id) {
+            try {
+                const profiles = await API.getAuthProfiles(); const profile = profiles.find(p => p.id === id); if (!profile) { showToast('Profile not found', 'error'); return; }
+                const providers = await API.getBuiltinProviders(); const select = document.getElementById('auth-provider'); select.innerHTML = '<option value="">Select provider...</option>' + Object.keys(providers).map(pid => `<option value="${pid}" ${pid === profile.provider ? 'selected' : ''}>${pid}</option>`).join('');
+                document.getElementById('auth-original-id').value = id; document.getElementById('auth-profile-id').value = id; document.getElementById('auth-type').value = profile.type; document.getElementById('auth-key').value = profile.key || ''; document.getElementById('auth-token').value = profile.token || ''; document.getElementById('auth-access').value = profile.access || ''; document.getElementById('auth-refresh').value = profile.refresh || ''; document.getElementById('auth-expires').value = profile.expires || ''; document.getElementById('auth-email').value = profile.email || ''; document.getElementById('auth-base-url').value = profile.baseUrl || '';
+                document.getElementById('auth-modal-title').textContent = 'Edit Auth Profile'; document.getElementById('delete-auth-btn').classList.remove('hidden'); updateAuthTypeVisibility(); openModal('auth-modal');
+            } catch (err) { showToast(`Failed: ${err.message}`, 'error'); }
+        }
+        async function deleteAuthProfile(id) { if (!confirm(`Delete auth profile "${id}"?`)) return; try { await API.deleteAuthProfile(id); closeModal('auth-modal'); showToast('Deleted', 'success'); loadAuthProfiles(); } catch (err) { showToast(`Failed: ${err.message}`, 'error'); } }
+        function updateAuthTypeVisibility() { const type = document.getElementById('auth-type').value; document.getElementById('auth-key-group').classList.toggle('hidden', type !== 'api_key'); document.getElementById('auth-token-group').classList.toggle('hidden', type !== 'token'); document.getElementById('auth-oauth-group').classList.toggle('hidden', type !== 'oauth'); }
+        document.getElementById('add-auth-btn').addEventListener('click', openAddAuthModal); document.getElementById('auth-type').addEventListener('change', updateAuthTypeVisibility);
+        document.getElementById('save-auth-btn').addEventListener('click', async () => {
+            const originalId = document.getElementById('auth-original-id').value; const id = document.getElementById('auth-profile-id').value.trim(); if (!id) { showToast('Profile ID required', 'error'); return; }
+            const provider = document.getElementById('auth-provider').value; if (!provider) { showToast('Provider required', 'error'); return; }
+            const type = document.getElementById('auth-type').value; const profile = { provider, type, email: document.getElementById('auth-email').value.trim() || null, expires: parseInt(document.getElementById('auth-expires').value) || null, baseUrl: document.getElementById('auth-base-url').value.trim() || null };
+            if (type === 'api_key') profile.key = document.getElementById('auth-key').value.trim() || null;
+            else if (type === 'token') profile.token = document.getElementById('auth-token').value.trim() || null;
+            else if (type === 'oauth') { profile.access = document.getElementById('auth-access').value.trim() || null; profile.refresh = document.getElementById('auth-refresh').value.trim() || null; }
+            try { await API.saveAuthProfile(id, profile); if (originalId && originalId !== id) await API.deleteAuthProfile(originalId); closeModal('auth-modal'); showToast('Saved', 'success'); loadAuthProfiles(); } catch (err) { showToast(`Failed: ${err.message}`, 'error'); }
+        });
+        document.getElementById('delete-auth-btn').addEventListener('click', async () => { const id = document.getElementById('auth-original-id').value; if (id) await deleteAuthProfile(id); });
+        document.getElementById('save-settings-btn').addEventListener('click', async () => { const provider = document.getElementById('default-provider').value; const model = document.getElementById('default-model').value; if (!provider || !model) { showToast('Select provider and model', 'warning'); return; } const defaultModel = `${provider}/${model}`; try { const config = await API.getConfig(); config.defaultModel = defaultModel; await API.saveConfig(config); showToast('Saved', 'success'); } catch (err) { showToast(`Failed: ${err.message}`, 'error'); } });
+        loadProviders();
+
+        // ====== Usage Tab (Chart.js) ======
+        let usageChartInstance = null;
+        let providerChartInstance = null;
+        function formatNumber(value) {
+            return Number(value || 0).toLocaleString();
+        }
+        function renderUsageList(targetId, rows, labelKey) {
+            const target = document.getElementById(targetId);
+            if (!target) return;
+            if (!rows || !rows.length) {
+                target.innerHTML = '<div class="usage-note">No records yet.</div>';
+                return;
+            }
+            target.innerHTML = rows.slice(0, 6).map(row => `
+                <div class="usage-list-item">
+                    <div>
+                        <div>${row[labelKey] || 'unknown'}</div>
+                        <div class="usage-list-meta">${formatNumber(row.requests || row.total_calls || 0)} requests</div>
+                    </div>
+                    <div>${formatNumber(row.total_tokens || 0)} tok</div>
+                </div>
+            `).join('');
+        }
+        function renderProviderTelemetry(rows) {
+            const target = document.getElementById('usage-provider-telemetry');
+            if (!target) return;
+            if (!rows || !rows.length) {
+                target.innerHTML = '<div class="usage-note">No provider telemetry available.</div>';
+                return;
+            }
+            target.innerHTML = rows.map(item => {
+                const note = item.telemetry?.note || 'Telemetry available';
+                const latestLimits = item.latest_observation?.meta?.rate_limits || {};
+                const limits = [
+                    latestLimits.requests_remaining ? `req ${latestLimits.requests_remaining}` : null,
+                    latestLimits.tokens_remaining ? `tok ${latestLimits.tokens_remaining}` : null,
+                    latestLimits.retry_after ? `retry ${latestLimits.retry_after}s` : null,
+                ].filter(Boolean).join(' • ');
+                return `
+                    <div class="usage-list-item">
+                        <div>
+                            <div>${item.provider}</div>
+                            <div class="usage-list-meta">${note}</div>
+                            ${limits ? `<div class="usage-list-meta">${limits}</div>` : ''}
+                        </div>
+                        <div>${item.profile_count || 0} profile(s)</div>
+                    </div>
+                `;
+            }).join('');
+        }
+        async function loadUsage() {
+            try {
+                const [overview, telemetry] = await Promise.all([
+                    fetch('/config/usage/overview').then(r => r.json()),
+                    fetch('/config/usage/provider-telemetry').then(r => r.json()),
+                ]);
+                const summary = overview.summary || {};
+                const chart = overview.chart || {};
+                const providers = overview.providers || [];
+                document.getElementById('stat-requests').textContent = Number(summary.requests || 0).toLocaleString();
+                document.getElementById('stat-tokens').textContent = Number(summary.total_tokens || 0).toLocaleString();
+                document.getElementById('stat-cost').textContent = '$' + Number(summary.total_cost || 0).toFixed(4);
+                document.getElementById('stat-latency').textContent = Number(summary.avg_latency_ms || 0).toFixed(0);
+                renderUsageList('usage-models', overview.models || [], 'model');
+                renderUsageList('usage-endpoints', overview.endpoints || [], 'endpoint');
+                renderUsageList('usage-sources', overview.sources || [], 'source');
+                renderProviderTelemetry(telemetry.providers || []);
+
+                const ctx = document.getElementById('usageChart').getContext('2d');
+                if (usageChartInstance) usageChartInstance.destroy();
+                usageChartInstance = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: chart.labels,
+                        datasets: [
+                            { label: 'Requests', data: chart.requests, borderColor: '#00f0ff', backgroundColor: 'rgba(0,240,255,0.1)', tension: 0.3, fill: true },
+                            { label: 'Tokens', data: chart.tokens, borderColor: '#ff00ff', backgroundColor: 'rgba(255,0,255,0.1)', tension: 0.3, fill: true, yAxisID: 'y1' }
+                        ]
+                    },
+                    options: {
+                        responsive: true, maintainAspectRatio: false,
+                        interaction: { mode: 'index', intersect: false },
+                        scales: {
+                            x: { ticks: { color: '#9090b0' }, grid: { color: 'rgba(0,240,255,0.1)' } },
+                            y: { ticks: { color: '#9090b0' }, grid: { color: 'rgba(0,240,255,0.1)' }, position: 'left' },
+                            y1: { ticks: { color: '#9090b0' }, grid: { display: false }, position: 'right' }
+                        },
+                        plugins: { legend: { labels: { color: '#e0e0ff' } } }
+                    }
+                });
+
+                const pCtx = document.getElementById('providerChart').getContext('2d');
+                if (providerChartInstance) providerChartInstance.destroy();
+                providerChartInstance = new Chart(pCtx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: providers.map(p => p.provider),
+                        datasets: [{ data: providers.map(p => p.total_tokens), backgroundColor: ['#00f0ff', '#ff00ff', '#b829ff', '#00ff41', '#ff0080', '#f0ff00'] }]
+                    },
+                    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { color: '#e0e0ff' } } } }
+                });
+            } catch (err) { showToast(`Failed to load usage: ${err.message}`, 'error'); }
+        }
+
+        // ====== Profiles Tab (Alpine.js) ======
+        function profileApp() {
+            return {
+                profiles: [],
+                importName: '',
+                importContent: '',
+                message: '',
+                async load() {
+                    try {
+                        const res = await fetch('/config/profiles');
+                        this.profiles = await res.json();
+                    } catch (e) { showToast('Failed to load profiles', 'error'); }
+                },
+                async saveCurrent() {
+                    const name = prompt('Profile name?'); if (!name) return;
+                    try {
+                        const res = await fetch('/config/profiles', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({name}) });
+                        const data = await res.json();
+                        this.message = data.status === 'ok' ? `Saved profile "${data.name}"` : 'Save failed';
+                        await this.load();
+                    } catch (e) { this.message = 'Save failed'; }
+                },
+                async activate(name) {
+                    if (!confirm(`Activate profile "${name}"?`)) return;
+                    try {
+                        const res = await fetch(`/config/profiles/${encodeURIComponent(name)}/activate`, { method: 'POST' });
+                        const data = await res.json();
+                        this.message = data.status === 'ok' ? `Activated "${data.name}"` : 'Activation failed';
+                    } catch (e) { this.message = 'Activation failed'; }
+                },
+                async exportProfile(name) {
+                    try {
+                        const res = await fetch(`/config/profiles/export/${encodeURIComponent(name)}`);
+                        const data = await res.json();
+                        const blob = new Blob([data.content], {type: 'application/json'});
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement('a'); a.href = url; a.download = `${name}.json`; a.click(); URL.revokeObjectURL(url);
+                    } catch (e) { showToast('Export failed', 'error'); }
+                },
+                async remove(name) {
+                    if (!confirm(`Delete profile "${name}"?`)) return;
+                    try {
+                        await fetch(`/config/profiles/export/${encodeURIComponent(name)}`, { method: 'DELETE' });
+                        await this.load();
+                    } catch (e) { showToast('Delete failed', 'error'); }
+                },
+                pickFile() { document.getElementById('profile-file-input').click(); },
+                readFile(event) {
+                    const file = event.target.files[0]; if (!file) return;
+                    const reader = new FileReader();
+                    reader.onload = (e) => { this.importContent = e.target.result; };
+                    reader.readAsText(file);
+                },
+                async doImport() {
+                    if (!this.importName || !this.importContent) { this.message = 'Name and content required'; return; }
+                    try {
+                        const res = await fetch('/config/profiles/import', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({name: this.importName, content: this.importContent}) });
+                        const data = await res.json();
+                        this.message = data.status === 'ok' ? `Imported "${data.name}"` : `Import failed: ${data.detail || 'unknown'}`;
+                        this.importName = ''; this.importContent = ''; document.getElementById('profile-file-input').value = '';
+                        await this.load();
+                    } catch (e) { this.message = 'Import failed'; }
+                }
+            };
+        }
+    </script>
+</body>
+</html>

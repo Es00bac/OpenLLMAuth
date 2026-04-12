@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Open LLM Auth - Configuration</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Open LLM Auth Configuration</h1>
+            <p class="subtitle">Manage providers, authentication profiles, and models</p>
+            <div style="margin-top: 15px;">
+                <a href="/chat" class="btn btn-primary">Open Chat Interface</a>
+            </div>
+        </header>
+
+        <nav class="tabs">
+            <button class="tab-btn active" data-tab="providers">Providers</button>
+            <button class="tab-btn" data-tab="auth">Auth Profiles</button>
+            <button class="tab-btn" data-tab="models">Models</button>
+            <button class="tab-btn" data-tab="settings">Settings</button>
+        </nav>
+
+        <!-- Providers Tab -->
+        <section id="providers-tab" class="tab-content active">
+            <div class="section-header">
+                <h2>Providers</h2>
+                <button class="btn btn-primary" id="add-provider-btn">Add Custom Provider</button>
+            </div>
+            <div class="card-list" id="providers-list">
+                <div class="loading">Loading providers...</div>
+            </div>
+        </section>
+
+        <!-- Auth Profiles Tab -->
+        <section id="auth-tab" class="tab-content">
+            <div class="section-header">
+                <h2>Authentication Profiles</h2>
+                <button class="btn btn-primary" id="add-auth-btn">Add Auth Profile</button>
+            </div>
+            <div class="card-list" id="auth-list">
+                <div class="loading">Loading auth profiles...</div>
+            </div>
+        </section>
+
+        <!-- Models Tab -->
+        <section id="models-tab" class="tab-content">
+            <div class="section-header">
+                <h2>Available Models</h2>
+                <span class="model-count" id="model-count"></span>
+            </div>
+            <div class="model-grid" id="models-list">
+                <div class="loading">Loading models...</div>
+            </div>
+        </section>
+
+        <!-- Settings Tab -->
+        <section id="settings-tab" class="tab-content">
+            <div class="section-header">
+                <h2>Settings</h2>
+            </div>
+            <div class="settings-card">
+                <div class="form-group">
+                    <label for="default-provider">Default Provider</label>
+                    <select id="default-provider" class="form-control">
+                        <option value="">Select a configured provider...</option>
+                    </select>
+                    <p class="help-text">Only providers with authentication profiles are shown</p>
+                </div>
+                <div class="form-group hidden" id="model-select-group">
+                    <label for="default-model">Default Model</label>
+                    <select id="default-model" class="form-control">
+                        <option value="">Select a provider first...</option>
+                    </select>
+                    <p class="help-text">Models available from the selected provider</p>
+                </div>
+                <div class="settings-preview hidden" id="default-model-preview">
+                    <span class="preview-label">Full model reference:</span>
+                    <code id="full-model-ref" class="preview-value"></code>
+                </div>
+                <button class="btn btn-primary" id="save-settings-btn">Save Settings</button>
+            </div>
+        </section>
+    </div>
+
+    <!-- Add/Edit Provider Modal -->
+    <div class="modal" id="provider-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="provider-modal-title">Add Provider</h3>
+                <button class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="provider-form">
+                    <input type="hidden" id="provider-original-id">
+                    <div class="form-group">
+                        <label for="provider-id">Provider ID</label>
+                        <input type="text" id="provider-id" class="form-control" placeholder="e.g., my-custom-provider" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="provider-base-url">Base URL</label>
+                        <input type="url" id="provider-base-url" class="form-control" placeholder="https://api.example.com/v1">
+                    </div>
+                    <div class="form-group">
+                        <label for="provider-api">API Type</label>
+                        <select id="provider-api" class="form-control">
+                            <option value="openai-completions">OpenAI Completions</option>
+                            <option value="openai-responses">OpenAI Responses</option>
+                            <option value="anthropic-messages">Anthropic Messages</option>
+                            <option value="google-generative-ai">Google Generative AI</option>
+                            <option value="bedrock-converse-stream">Bedrock Converse Stream</option>
+                            <option value="ollama">Ollama</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="provider-auth">Authentication Mode</label>
+                        <select id="provider-auth" class="form-control">
+                            <option value="api-key">API Key</option>
+                            <option value="oauth">OAuth</option>
+                            <option value="token">Token</option>
+                            <option value="aws-sdk">AWS SDK</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="provider-api-key">Default API Key</label>
+                        <input type="password" id="provider-api-key" class="form-control" placeholder="Leave blank to use auth profiles">
+                    </div>
+                    <div class="form-group checkbox">
+                        <label>
+                            <input type="checkbox" id="provider-auth-header" checked>
+                            Send Authorization Header
+                        </label>
+                    </div>
+                    <div class="form-group">
+                        <label>Custom Headers</label>
+                        <div id="provider-headers" class="key-value-list">
+                            <div class="key-value-row">
+                                <input type="text" class="form-control header-key" placeholder="Header name">
+                                <input type="text" class="form-control header-value" placeholder="Header value">
+                                <button type="button" class="btn btn-icon remove-header">&minus;</button>
+                            </div>
+                        </div>
+                        <button type="button" class="btn btn-secondary" id="add-header-btn">+ Add Header</button>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary modal-cancel">Cancel</button>
+                <button type="button" class="btn btn-primary" id="save-provider-btn">Save Provider</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add/Edit Auth Profile Modal -->
+    <div class="modal" id="auth-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="auth-modal-title">Add Auth Profile</h3>
+                <button class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="auth-form">
+                    <input type="hidden" id="auth-original-id">
+                    <div class="form-group">
+                        <label for="auth-profile-id">Profile ID</label>
+                        <input type="text" id="auth-profile-id" class="form-control" placeholder="e.g., openai:personal" required>
+                        <p class="help-text">Format: provider:name (e.g., "openai:work", "anthropic:personal")</p>
+                    </div>
+                    <div class="form-group">
+                        <label for="auth-provider">Provider</label>
+                        <select id="auth-provider" class="form-control" required>
+                            <option value="">Select provider...</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="auth-type">Credential Type</label>
+                        <select id="auth-type" class="form-control">
+                            <option value="api_key">API Key</option>
+                            <option value="token">Token</option>
+                            <option value="oauth">OAuth</option>
+                        </select>
+                    </div>
+                    <div class="form-group" id="auth-key-group">
+                        <label for="auth-key">API Key</label>
+                        <input type="password" id="auth-key" class="form-control" placeholder="sk-...">
+                    </div>
+                    <div class="form-group hidden" id="auth-token-group">
+                        <label for="auth-token">Token</label>
+                        <input type="password" id="auth-token" class="form-control">
+                    </div>
+                    <div class="form-group hidden" id="auth-oauth-group">
+                        <label for="auth-access">Access Token</label>
+                        <input type="password" id="auth-access" class="form-control">
+                        <label for="auth-refresh" class="mt-2">Refresh Token (optional)</label>
+                        <input type="password" id="auth-refresh" class="form-control">
+                    </div>
+                    <div class="form-group">
+                        <label for="auth-expires">Expires At (timestamp, optional)</label>
+                        <input type="number" id="auth-expires" class="form-control" placeholder="Milliseconds since epoch">
+                    </div>
+                    <div class="form-group">
+                        <label for="auth-email">Email (optional)</label>
+                        <input type="email" id="auth-email" class="form-control">
+                    </div>
+                    <div class="form-group">
+                        <label for="auth-base-url">Custom Base URL (optional)</label>
+                        <input type="url" id="auth-base-url" class="form-control">
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-danger" id="delete-auth-btn">Delete</button>
+                <button type="button" class="btn btn-secondary modal-cancel">Cancel</button>
+                <button type="button" class="btn btn-primary" id="save-auth-btn">Save Profile</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notifications -->
+    <div id="toast-container"></div>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>

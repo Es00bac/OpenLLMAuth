@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Open LLM Auth - Chat</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="/static/chat.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+</head>
+<body>
+    <div class="chat-layout">
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <h2>Chat History</h2>
+                <button id="new-chat-btn" class="btn btn-primary">+ New Chat</button>
+            </div>
+            <div class="chat-list" id="chat-list">
+                <!-- Chat history items -->
+            </div>
+            <div class="sidebar-section" style="padding: 10px; border-top: 1px solid var(--border-color);">
+                <label for="server-token" style="font-size: 12px; color: var(--text-muted);">Server Token:</label>
+                <input type="password" id="server-token" class="form-control" style="margin-top: 5px; font-size: 12px;" placeholder="Enter token if required">
+            </div>
+            <div class="sidebar-footer">
+                <a href="/" class="btn btn-secondary" style="display:block; text-align:center;">Configuration</a>
+            </div>
+        </aside>
+        <main class="chat-main">
+            <header class="chat-header">
+                <div class="model-selector-container">
+                    <label for="model-select">Model:</label>
+                    <select id="model-select" class="form-control" style="min-width: 250px;">
+                        <option value="">Loading models...</option>
+                    </select>
+                </div>
+                <div class="toggle-container" style="display:flex; align-items:center; margin-left:15px;">
+                    <label style="display:flex; align-items:center; gap:5px; cursor:pointer;">
+                        <input type="checkbox" id="thinking-mode-toggle">
+                        Thinking Mode
+                    </label>
+                </div>
+            </header>
+            <div class="chat-messages" id="chat-messages">
+                <!-- Messages -->
+            </div>
+            <div class="chat-input-container">
+                <form id="chat-form">
+                    <textarea id="chat-input" placeholder="Type a message... (Shift+Enter for newline)" rows="1"></textarea>
+                    <button type="submit" id="send-btn" class="btn btn-primary" title="Send">↑</button>
+                </form>
+            </div>
+        </main>
+    </div>
+    <!-- Toast Notifications -->
+    <div id="toast-container"></div>
+    <script src="/static/chat.js?v=4"></script>
+</body>
+</html>
