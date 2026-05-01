@@ -40,10 +40,10 @@ def _patch_config(monkeypatch: pytest.MonkeyPatch, cfg: Config) -> None:
     )
     reset_durable_state_store_cache()
     reset_task_contract_cache()
-    monkeypatch.setattr(auth_module, "load_config", lambda: cfg)
-    monkeypatch.setattr(manager_module, "load_config", lambda: cfg)
-    monkeypatch.setattr(config_routes_module, "load_config", lambda: cfg)
-    monkeypatch.setattr(routes_module, "load_config", lambda: cfg)
+    monkeypatch.setattr(auth_module, "load_config", lambda *args, **kwargs: cfg)
+    monkeypatch.setattr(manager_module, "load_config", lambda *args, **kwargs: cfg)
+    monkeypatch.setattr(config_routes_module, "load_config", lambda *args, **kwargs: cfg)
+    monkeypatch.setattr(routes_module, "load_config", lambda *args, **kwargs: cfg)
     routes_module.manager._config = cfg
     routes_module.manager._providers = {}
 

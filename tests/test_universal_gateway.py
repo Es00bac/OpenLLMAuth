@@ -41,10 +41,10 @@ def _patch_config(monkeypatch: pytest.MonkeyPatch, cfg: Config) -> None:
     )
     reset_durable_state_store_cache()
     reset_task_contract_cache()
-    monkeypatch.setattr(auth_module, "load_config", lambda: cfg)
-    monkeypatch.setattr(manager_module, "load_config", lambda: cfg)
-    monkeypatch.setattr(config_routes_module, "load_config", lambda: cfg)
-    monkeypatch.setattr(routes_module, "load_config", lambda: cfg)
+    monkeypatch.setattr(auth_module, "load_config", lambda *args, **kwargs: cfg)
+    monkeypatch.setattr(manager_module, "load_config", lambda *args, **kwargs: cfg)
+    monkeypatch.setattr(config_routes_module, "load_config", lambda *args, **kwargs: cfg)
+    monkeypatch.setattr(routes_module, "load_config", lambda *args, **kwargs: cfg)
     routes_module.manager._config = cfg
     routes_module.manager._providers = {}
 
@@ -980,9 +980,9 @@ def test_idempotency_replay_survives_cache_reset(monkeypatch: pytest.MonkeyPatch
         durable_state=DurableStateConfig(db_path=str(db_path), enabled=True),
     )
     reset_durable_state_store_cache()
-    monkeypatch.setattr(auth_module, "load_config", lambda: cfg)
-    monkeypatch.setattr(config_routes_module, "load_config", lambda: cfg)
-    monkeypatch.setattr(routes_module, "load_config", lambda: cfg)
+    monkeypatch.setattr(auth_module, "load_config", lambda *args, **kwargs: cfg)
+    monkeypatch.setattr(config_routes_module, "load_config", lambda *args, **kwargs: cfg)
+    monkeypatch.setattr(routes_module, "load_config", lambda *args, **kwargs: cfg)
     calls = {"count": 0}
 
     provider = AgentBridgeProvider(provider_id="agent_bridge", base_url="http://127.0.0.1:1")
@@ -1031,9 +1031,9 @@ def test_task_owner_survives_cache_reset(monkeypatch: pytest.MonkeyPatch) -> Non
         durable_state=DurableStateConfig(db_path=str(db_path), enabled=True),
     )
     reset_durable_state_store_cache()
-    monkeypatch.setattr(auth_module, "load_config", lambda: cfg)
-    monkeypatch.setattr(config_routes_module, "load_config", lambda: cfg)
-    monkeypatch.setattr(routes_module, "load_config", lambda: cfg)
+    monkeypatch.setattr(auth_module, "load_config", lambda *args, **kwargs: cfg)
+    monkeypatch.setattr(config_routes_module, "load_config", lambda *args, **kwargs: cfg)
+    monkeypatch.setattr(routes_module, "load_config", lambda *args, **kwargs: cfg)
 
     provider = AgentBridgeProvider(provider_id="agent_bridge", base_url="http://127.0.0.1:1")
 

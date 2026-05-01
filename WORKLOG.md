@@ -42,7 +42,7 @@ Compared open_llm_auth providers against openclaw_latest reference implementatio
 - ✅ `oauth` - Working (Anthropic, OpenAI Codex auto-refresh)
 - ✅ `token` - Working
 - ⚠️ `cli` - Partially working (claude-cli has issues)
-- ❌ `aws-sdk` - Has placeholder in config but no SigV4 implementation
+- ❌ `aws-sdk` - Declared in early config without a SigV4 implementation at that point
 - ❌ `setup-token` - Not distinguished from regular token (no validation)
 
 ### Work Items Identified

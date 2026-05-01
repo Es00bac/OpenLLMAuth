@@ -1,9 +1,9 @@
 [project]
 name = "open_llm_auth"
 version = "0.1.0"
-description = "LLM Router and Authenticator compatible with OpenAI API"
+description = "Local AI provider gateway with OpenAI-compatible chat, auth profile routing, and agent task APIs"
 authors = [
-    {name = "Your Name", email = "your.email@example.com"},
+    {name = "OpenLLMAuth contributors"},
 ]
 dependencies = [
     "fastapi",
@@ -20,6 +20,12 @@ requires-python = ">=3.9"
 
 [project.scripts]
 open-llm-auth = "open_llm_auth.cli:app"
+
+[dependency-groups]
+dev = [
+    "pytest",
+    "pytest-asyncio",
+]
 
 [build-system]
 requires = ["hatchling"]

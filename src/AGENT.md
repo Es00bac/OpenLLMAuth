@@ -4,7 +4,7 @@ This file is for agents that need to call the live gateway rather than edit it.
 
 ## Active Code Boundary
 
-Use the package under `open_llm_auth`. Ignore duplicate legacy trees such as `src/src/open_llm_auth` and packaged artifacts under `pkg/` when reasoning about current behavior.
+Use the package under `open_llm_auth` when reasoning about current behavior.
 
 ## Network Surfaces
 

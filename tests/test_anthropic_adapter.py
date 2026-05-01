@@ -456,7 +456,7 @@ class TestConvertResponse:
 # 7. Live Integration Tests (against running server at port 8000)
 # ─────────────────────────────────────────────────────────────
 
-LIVE = os.environ.get("OPEN_LLM_AUTH_LIVE_TESTS", "1") == "1"
+LIVE = os.environ.get("OPEN_LLM_AUTH_LIVE_TESTS", "0") == "1"
 pytest_live = pytest.mark.skipif(not LIVE, reason="live server not available")
 
 

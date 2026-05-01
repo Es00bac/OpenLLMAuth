@@ -5,69 +5,119 @@
 ![Surface](https://img.shields.io/badge/api-OpenAI--compatible-6b46c1)
 ![Status](https://img.shields.io/badge/status-active%20development-c97b18)
 
-OpenLLMAuth is a local gateway for AI clients and agent runtimes.
+OpenLLMAuth is a local AI-provider gateway. It gives tools, agents, and scripts
+one stable API for chat completions, model discovery, provider credentials,
+runtime task execution, and policy enforcement.
 
-It exposes an OpenAI-compatible chat surface plus a universal task surface, while keeping credential resolution, scoped access control, outbound egress policy, and durable task ownership under operator control.
+The project is useful when you want local clients to call one endpoint while the
+gateway handles provider selection, auth profiles, scoped access tokens,
+outbound egress checks, usage accounting, and durable task ownership.
 
-If you want one stable local API between your tools and multiple providers or runtime backends, this is the project.
+## What It Provides
 
-## Why it exists
-
-- Give local tools one consistent surface instead of wiring every client directly to each provider.
-- Centralize provider credential lookup, profile fallback, and alias resolution.
-- Enforce scoped bearer-token access instead of relying on one all-powerful shared token.
-- Keep outbound traffic behind explicit egress policy checks.
-- Support task-oriented runtimes with durable ownership, idempotency, and contract checks.
+- OpenAI-compatible `POST /v1/chat/completions` and `GET /v1/models`.
+- A universal task API for agent runtimes and long-running work.
+- A browser admin dashboard for providers, auth profiles, usage, and model
+  selection.
+- Provider credential resolution from config, environment variables, OAuth
+  profiles, CLI-backed providers, and AWS SDK credentials.
+- Scoped bearer-token access for read, write, and admin routes.
+- Egress policy checks for outbound provider URLs.
+- Durable SQLite-backed idempotency and task ownership state.
+- Provider adapters for OpenAI-compatible, Anthropic-compatible, Codex,
+  Bedrock Converse, CLI-backed, and local OpenAI-compatible runtimes.
 
 ## Quickstart
+
+Requirements:
+
+- Python 3.11 or newer
+- `uv` recommended, or `pip` with a virtual environment
 
 ```bash
 git clone https://github.com/Es00bac/OpenLLMAuth.git
 cd OpenLLMAuth
 uv sync
+uv run open-llm-auth serve --host 127.0.0.1 --port 8080
+```
+
+If you are not using `uv`:
+
+```bash
+python -m venv .venv
+. .venv/bin/activate
+pip install -e .
 open-llm-auth serve --host 127.0.0.1 --port 8080
 ```
 
-Repo-local venv alternative:
+Useful URLs after startup:
+
+- `http://127.0.0.1:8080/` - admin dashboard
+- `http://127.0.0.1:8080/chat` - simple browser chat UI
+- `http://127.0.0.1:8080/docs` - FastAPI OpenAPI docs
+- `http://127.0.0.1:8080/health` - health check
+
+## First Provider
+
+Add an API-key profile:
 
 ```bash
-.venv/bin/python -m open_llm_auth.cli serve --host 127.0.0.1 --port 8080
+uv run open-llm-auth auth add-api-key openai --profile default
+uv run open-llm-auth models set-default openai/gpt-5.2
+uv run open-llm-auth auth set-server-token
+uv run open-llm-auth models list
 ```
 
-Primary surfaces once the server is running:
+Start the server, then call the OpenAI-compatible endpoint with your local
+server token:
+
+```bash
+curl http://127.0.0.1:8080/v1/chat/completions \
+  -H "Authorization: Bearer YOUR_LOCAL_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "openai/gpt-5.2",
+    "messages": [{"role": "user", "content": "Say hello in one sentence."}]
+  }'
+```
+
+Protected calls use the same bearer token:
+
+```bash
+curl http://127.0.0.1:8080/v1/models \
+  -H "Authorization: Bearer YOUR_LOCAL_TOKEN"
+```
+
+## Documentation
+
+- [Installation](docs/installation.md)
+- [Configuration](docs/configuration.md)
+- [API Reference](docs/api.md)
+- [Providers](docs/providers.md)
+- [Security Model](docs/security.md)
+- [Agent Bridge Integration](docs/agent-bridge.md)
+- [Development](docs/development.md)
+
+## Source Layout
+
+The active Python package is [`src/open_llm_auth`](src/open_llm_auth).
+
+Important entrypoints:
+
+- [`src/open_llm_auth/main.py`](src/open_llm_auth/main.py) - FastAPI app assembly
+- [`src/open_llm_auth/cli.py`](src/open_llm_auth/cli.py) - Typer CLI
+- [`src/open_llm_auth/server/routes.py`](src/open_llm_auth/server/routes.py) - `/v1/*` routes
+- [`src/open_llm_auth/server/config_routes.py`](src/open_llm_auth/server/config_routes.py) - `/config/*` routes
+- [`src/open_llm_auth/auth/manager.py`](src/open_llm_auth/auth/manager.py) - provider and credential resolution
+- [`src/open_llm_auth/provider_catalog.py`](src/open_llm_auth/provider_catalog.py) - built-in provider and model catalog
+
+## Supported Route Families
 
 - `GET /health`
-- `GET /docs`
-- `GET /chat`
-- `GET /config`
+- `GET /`, `GET /chat`, `GET /docs`
 - `POST /v1/chat/completions`
+- `POST /v1/embeddings`
 - `GET /v1/models`
-
-## Current source of truth
-
-The active package is [`src/open_llm_auth`](./src/open_llm_auth).
-
-Duplicate trees such as `src/src/open_llm_auth` and packaged artifacts under `pkg/` are not the live source of truth for current development.
-
-## Key capabilities
-
-- OpenAI-compatible chat API for local tools and clients.
-- Universal task API for agent and runtime backends.
-- Centralized auth/profile resolution across configured providers.
-- Scoped bearer tokens for operator and client access.
-- Egress policy enforcement for outbound provider traffic.
-- Durable task ownership and idempotency state.
-- Agent Bridge integration for chat and task lifecycle operations.
-
-## API surface
-
-### OpenAI-compatible
-
-- `POST /v1/chat/completions`
-- `GET /v1/models`
-
-### Universal and task
-
 - `POST /v1/universal`
 - `POST /v1/universal/tasks`
 - `GET /v1/universal/tasks`
@@ -78,147 +128,29 @@ Duplicate trees such as `src/src/open_llm_auth` and packaged artifacts under `pk
 - `GET /v1/universal/tasks/{task_id}/events`
 - `POST /v1/universal/tasks/{task_id}/wait`
 - `GET /v1/universal/contract/status`
-
-### Config and admin
-
-- `GET /config`
-- `POST /config`
-- `GET /config/builtin-providers`
-- `GET /config/providers`
-- `PUT /config/providers/{provider_id}`
-- `DELETE /config/providers/{provider_id}`
-- `GET /config/auth-profiles`
-- `PUT /config/auth-profiles/{profile_id}`
-- `DELETE /config/auth-profiles/{profile_id}`
-- `GET /config/config-file-path`
-- `GET /config/configured-providers`
-- `GET /config/providers/{provider_id}/models`
-
-## Architecture
-
-Live entrypoints:
-
-- [`src/open_llm_auth/main.py`](./src/open_llm_auth/main.py): FastAPI app, static UI mount, root/chat/config pages
-- [`src/open_llm_auth/server/routes.py`](./src/open_llm_auth/server/routes.py): `/v1/*` API routes
-- [`src/open_llm_auth/server/config_routes.py`](./src/open_llm_auth/server/config_routes.py): `/config/*` admin/config routes
-- [`src/open_llm_auth/cli.py`](./src/open_llm_auth/cli.py): Typer CLI
-
-Core subsystems:
-
-- `auth/manager.py`: provider resolution, profile/env/config credential lookup, fallback ordering, runtime egress validation
-- `config.py`: persisted config model at `~/.open_llm_auth/config.json`
-- `provider_catalog.py`: builtin provider/model catalog plus provider aliases and env-var lookup rules
-- `server/auth.py`: bearer-token verification and scope enforcement
-- `server/task_contract.py`: Agent Bridge task-contract compatibility checks
-- `server/idempotency.py` and `server/durable_state.py`: in-memory and SQLite-backed idempotency/ownership primitives
-- `providers/agent_bridge.py`: bridge to Agent Bridge chat and task lifecycle endpoints
-
-## Authentication and policy model
-
-Current auth behavior from `src/open_llm_auth/server/auth.py`:
-
-- configured access tokens live in `authorization.tokens`
-- each token can carry scopes such as `read`, `write`, `admin`
-- `admin=true` implies all three scopes
-- legacy admin compatibility can still use `serverToken` or `OPEN_LLM_AUTH_TOKEN`
-- `OPEN_LLM_AUTH_ALLOW_ANON=1` enables anonymous admin access only when no configured or legacy token exists
-- config routes require admin scope
-- task and chat routes generally require write scope
-
-## Configuration model
-
-Config file location:
-
-```text
-~/.open_llm_auth/config.json
-```
-
-Important top-level sections:
-
-- `authProfiles` and `authOrder`
-- compatibility mirrors: `auth.profiles` and `auth.order`
-- `providers`
-- `models.mode` and `models.providers`
-- `authorization.tokens`
-- `durableState`
-- `egressPolicy`
-- `taskContract`
-- `defaultModel`
-- `serverToken`
-
-Current config behavior:
-
-- secret-bearing fields are redacted in config API responses
-- outbound provider base URLs are validated against egress policy both at config-write time and runtime resolution time
-- durable task/idempotency state defaults to a SQLite file under `~/.open_llm_auth/runtime_state.sqlite3`
-
-## Provider resolution rules
-
-`ProviderManager` merges builtin catalog entries with local config and resolves credentials in this order:
-
-- explicit preferred profile, if supplied
-- configured auth-order list for that provider
-- discovered profiles for that provider
-- provider-specific environment variables
-- provider config `api_key`
-- special auth paths such as AWS SDK or CLI-backed providers
-
-Important resolution behavior:
-
-- provider aliases are normalized, for example `chatgpt -> openai-codex`, `codex -> openai-codex`, `bedrock -> amazon-bedrock`
-- bare model IDs are inferred only when there is a unique match or a small heuristic fallback
-- local backends such as `ollama`, `vllm`, and `amazon-bedrock` do not self-activate just because they exist in the catalog; they still need explicit config or usable credentials
-- `agent_bridge` and `agent` are manager-defined local bridges, not entries in the builtin provider map
-
-## Agent Bridge integration
-
-Current behavior from `src/open_llm_auth/providers/agent_bridge.py`:
-
-- base URL defaults to `http://127.0.0.1:20100/v1`
-- standard chat requests call `POST /chat`
-- task creation, status, retry, approve, cancel, list, and events use Agent Bridge lifecycle endpoints
-- mutating task operations attach contract headers such as `X-Provider-Contract-Version`
-- streaming task output is synthesized by polling task snapshots and task events and converting them into OpenAI-style SSE chunks
-- plain chat requests rebuild a bounded context block from recent transcript turns because Agent Bridge's direct chat API is single-turn
-
-## Security and resilience
-
-Implemented hardening that matters operationally:
-
-- fail-closed auth when no token is configured
-- optional scoped configured tokens instead of one shared admin secret
-- egress policy with allow-local-provider exceptions and metadata-address denial
-- durable task ownership checks for universal task routes
-- durable idempotency keys for task mutations
-- task-contract validation against Agent Bridge before mutating task routes
-- sanitized upstream HTTP errors
-- secret redaction in config responses
+- `/config/*` admin, provider, model, usage, and profile endpoints
 
 ## Testing
 
-The active test suite lives under [`tests`](./tests).
-
-Important coverage areas:
-
-- `tests/test_universal_gateway.py`
-- `tests/test_gateway_security_hardening.py`
-- `tests/test_provider_manager.py`
-- `tests/test_agent_bridge_provider.py`
-- `tests/test_bedrock_provider.py`
-- `tests/test_anthropic_adapter.py`
-- `tests/test_auth_manager_parsing.py`
-
-Typical verification:
-
 ```bash
-.venv/bin/pytest -q tests
+uv run pytest -q tests
 ```
 
-## Release checklist
+Live Anthropic adapter tests are opt-in:
 
-- Run `.venv/bin/pytest -q tests`.
-- Start the gateway and verify `/health`, `/docs`, `/v1/models`, and `/v1/chat/completions` still behave as documented.
-- Confirm token scope behavior for read, write, and admin routes.
-- Verify config responses still redact secrets and respect egress policy.
-- Smoke-test task routes against the active Agent Bridge or runtime backend.
-- Re-read README quickstart and endpoint lists after any CLI or route changes.
+```bash
+OPEN_LLM_AUTH_LIVE_TESTS=1 uv run pytest -q tests/test_anthropic_adapter.py
+```
+
+For a smaller smoke pass:
+
+```bash
+uv run pytest -q tests/test_provider_manager.py tests/test_config_routes_dashboard.py
+```
+
+## Project Status
+
+OpenLLMAuth is active development software. The public API is intended to be
+practical and stable enough for local experimentation, but provider catalogs and
+third-party auth flows can change. Check the documentation and test coverage
+before using it as a critical production gateway.
