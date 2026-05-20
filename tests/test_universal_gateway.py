@@ -41,10 +41,10 @@ def _patch_config(monkeypatch: pytest.MonkeyPatch, cfg: Config) -> None:
     )
     reset_durable_state_store_cache()
     reset_task_contract_cache()
-    monkeypatch.setattr(auth_module, "load_config", lambda *args, **kwargs: cfg)
-    monkeypatch.setattr(manager_module, "load_config", lambda *args, **kwargs: cfg)
-    monkeypatch.setattr(config_routes_module, "load_config", lambda *args, **kwargs: cfg)
-    monkeypatch.setattr(routes_module, "load_config", lambda *args, **kwargs: cfg)
+    monkeypatch.setattr(auth_module, "load_config", lambda: cfg)
+    monkeypatch.setattr(manager_module, "load_config", lambda: cfg)
+    monkeypatch.setattr(config_routes_module, "load_config", lambda: cfg)
+    monkeypatch.setattr(routes_module, "load_config", lambda: cfg)
     routes_module.manager._config = cfg
     routes_module.manager._providers = {}
 
@@ -295,7 +295,7 @@ def test_universal_task_lifecycle_routes(monkeypatch: pytest.MonkeyPatch) -> Non
         headers=_auth_header(),
         json={
             "provider": "agent_bridge",
-            "operator": "operator",
+            "operator": "jarrod",
         },
     )
     cancel_resp = client.post(
@@ -323,7 +323,7 @@ def test_universal_task_lifecycle_routes(monkeypatch: pytest.MonkeyPatch) -> Non
         "approval_id": "approval-1",
         "approved": True,
     }
-    assert calls["retry_task"] == {"task_id": "task-1", "operator": "operator"}
+    assert calls["retry_task"] == {"task_id": "task-1", "operator": "jarrod"}
     assert calls["cancel_task"] == {"task_id": "task-1"}
 
 
@@ -695,7 +695,7 @@ def test_lifecycle_mutations_idempotent(monkeypatch: pytest.MonkeyPatch) -> None
     a2 = client.post("/v1/universal/tasks/task-7/approve", headers=approve_headers, json=approve_body)
 
     retry_headers = {**_auth_header(), "Idempotency-Key": "idem-retry-1"}
-    retry_body = {"provider": "agent_bridge", "operator": "operator"}
+    retry_body = {"provider": "agent_bridge", "operator": "jarrod"}
     r1 = client.post("/v1/universal/tasks/task-7/retry", headers=retry_headers, json=retry_body)
     r2 = client.post("/v1/universal/tasks/task-7/retry", headers=retry_headers, json=retry_body)
 
@@ -980,9 +980,9 @@ def test_idempotency_replay_survives_cache_reset(monkeypatch: pytest.MonkeyPatch
         durable_state=DurableStateConfig(db_path=str(db_path), enabled=True),
     )
     reset_durable_state_store_cache()
-    monkeypatch.setattr(auth_module, "load_config", lambda *args, **kwargs: cfg)
-    monkeypatch.setattr(config_routes_module, "load_config", lambda *args, **kwargs: cfg)
-    monkeypatch.setattr(routes_module, "load_config", lambda *args, **kwargs: cfg)
+    monkeypatch.setattr(auth_module, "load_config", lambda: cfg)
+    monkeypatch.setattr(config_routes_module, "load_config", lambda: cfg)
+    monkeypatch.setattr(routes_module, "load_config", lambda: cfg)
     calls = {"count": 0}
 
     provider = AgentBridgeProvider(provider_id="agent_bridge", base_url="http://127.0.0.1:1")
@@ -1031,9 +1031,9 @@ def test_task_owner_survives_cache_reset(monkeypatch: pytest.MonkeyPatch) -> Non
         durable_state=DurableStateConfig(db_path=str(db_path), enabled=True),
     )
     reset_durable_state_store_cache()
-    monkeypatch.setattr(auth_module, "load_config", lambda *args, **kwargs: cfg)
-    monkeypatch.setattr(config_routes_module, "load_config", lambda *args, **kwargs: cfg)
-    monkeypatch.setattr(routes_module, "load_config", lambda *args, **kwargs: cfg)
+    monkeypatch.setattr(auth_module, "load_config", lambda: cfg)
+    monkeypatch.setattr(config_routes_module, "load_config", lambda: cfg)
+    monkeypatch.setattr(routes_module, "load_config", lambda: cfg)
 
     provider = AgentBridgeProvider(provider_id="agent_bridge", base_url="http://127.0.0.1:1")
 

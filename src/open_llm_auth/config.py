@@ -11,7 +11,7 @@ from __future__ import annotations
 import os
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Literal, Optional, Tuple
+from typing import Dict, List, Literal, Optional, Tuple
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -193,6 +193,25 @@ class TaskContractConfig(BaseModel):
     fail_closed: bool = Field(default=False, alias="failClosed")
 
 
+class ProviderFallbackConfig(BaseModel):
+    """Ordered cross-provider fallback policy.
+
+    Keys in ``order`` may be exact model refs (``provider/model``), provider
+    ids, or operation-prefixed variants such as ``chat:provider/model``.
+    Values are ordered model refs to try after the primary provider/key chain.
+    """
+
+    model_config = ConfigDict(populate_by_name=True, extra="ignore")
+
+    enabled: bool = True
+    order: Dict[str, List[str]] = Field(default_factory=dict)
+    retry_status_codes: List[int] = Field(
+        default_factory=lambda: [429, 500, 502, 503, 504],
+        alias="retryStatusCodes",
+    )
+    max_attempts: int = Field(default=6, alias="maxAttempts")
+
+
 class Config(BaseModel):
     """Top-level persisted gateway config.
 
@@ -224,6 +243,11 @@ class Config(BaseModel):
         default_factory=TaskContractConfig,
         alias="taskContract",
     )
+    provider_fallback: ProviderFallbackConfig = Field(
+        default_factory=ProviderFallbackConfig,
+        alias="providerFallback",
+    )
+    active_provider_ids: List[str] = Field(default_factory=list, alias="activeProviderIds")
     default_model: Optional[str] = Field(
         default="kimi-coding/k2p5", alias="defaultModel"
     )
@@ -269,6 +293,14 @@ class Config(BaseModel):
         for provider, cfg in self.models.providers.items():
             merged[normalize_provider_id(provider)] = cfg
         return merged
+
+    def active_provider_id_set(self) -> set[str]:
+        """Return the normalized optional allowlist for background provider work."""
+        return {
+            normalize_provider_id(provider)
+            for provider in self.active_provider_ids
+            if isinstance(provider, str) and provider.strip()
+        }
 
 
 def _resolve_secret_input(value: Optional[str]) -> Optional[str]:

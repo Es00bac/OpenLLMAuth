@@ -33,13 +33,10 @@ class OpenAIProvider(BaseProvider):
                 if not tool_calls and content:
                     import re
                     import json
-                    
                     import time
-                    
+
                     syn_tool_calls = []
 
-                    print(f"[DEBUG] openai_provider content: {repr(content)}")
-                    
                     # 1. Match XML <tool>...</tool><args>...</args>
                     xml_match = re.search(r"<tool>(.*?)<\/tool>.*?<args>(.*?)<\/args>", content, flags=re.DOTALL)
                     # 2. Match <invoke name="..."><parameter>...</parameter><content>...</content>
@@ -48,9 +45,7 @@ class OpenAIProvider(BaseProvider):
                     json_match = re.search(r'```(?:json)?\s*(\{.*?"tool_calls".*?\})\s*```', content, flags=re.DOTALL)
                     # 4. Match raw bash/sh blocks
                     bash_match = re.search(r'```(?:bash|sh)\s*(.*?)\s*```', content, flags=re.DOTALL)
-                    
-                    print(f"[DEBUG] openai match status -> xml:{bool(xml_match)} invoke:{bool(invoke_match)} json:{bool(json_match)} bash:{bool(bash_match)}")
-                    
+
                     if invoke_match:
                         import time
                         file_path = invoke_match.group(2).strip()

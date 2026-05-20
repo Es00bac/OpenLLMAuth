@@ -3,6 +3,7 @@ from .base import BaseProvider
 from .bedrock_converse import BedrockConverseProvider
 from .claude_cli import ClaudeCliProvider
 from .codex_cli import CodexCliProvider
+from .local_embeddings import LocalEmbeddingProvider
 from .minimax import MinimaxProvider
 from .openai_codex import OpenAICodexProvider
 from .openai_provider import OpenAIProvider
@@ -18,4 +19,5 @@ __all__ = [
     "AgentBridgeProvider",
     "ClaudeCliProvider",
     "CodexCliProvider",
+    "LocalEmbeddingProvider",
 ]

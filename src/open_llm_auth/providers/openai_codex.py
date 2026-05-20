@@ -178,6 +178,9 @@ class OpenAICodexProvider(BaseProvider):
             _extract_account_id(api_key) if api_key else None
         )
 
+    def supports_reasoning_effort(self, *, model: str | None = None) -> bool:
+        return True
+
     def _build_codex_headers(self) -> Dict[str, str]:
         headers = {**self.headers}
         if self.api_key:
@@ -212,6 +215,8 @@ class OpenAICodexProvider(BaseProvider):
         body["instructions"] = instructions or ""
 
         # Note: temperature is not supported by the Codex responses API
+        if payload.get("reasoning_effort"):
+            body["reasoning"] = {"effort": payload["reasoning_effort"]}
 
         tools = _convert_tools_to_codex(payload.get("tools"))
         if tools:
@@ -285,6 +290,7 @@ class OpenAICodexProvider(BaseProvider):
                         "prompt_tokens": resp_usage.get("input_tokens", 0),
                         "completion_tokens": resp_usage.get("output_tokens", 0),
                         "total_tokens": resp_usage.get("total_tokens", 0),
+                        "prompt_tokens_details": {"cached_tokens": cached},
                     }
                 status = resp.get("status", "completed")
                 if status == "incomplete":

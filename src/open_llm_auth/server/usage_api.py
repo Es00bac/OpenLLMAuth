@@ -29,6 +29,7 @@ async def collect_provider_telemetry(
     days: int = 7,
     manager: Optional[ProviderManager] = None,
     store: Optional[UsageStore] = None,
+    provider_ids: Optional[List[str]] = None,
 ) -> List[Dict[str, Any]]:
     usage_store = store or get_usage_store()
     provider_manager = manager or ProviderManager()
@@ -41,9 +42,18 @@ async def collect_provider_telemetry(
         provider_id = normalize_provider_id(str(item.get("provider") or "unknown"))
         latest_meta_by_provider.setdefault(provider_id, item)
 
-    provider_ids = _collect_provider_ids(provider_manager, usage_store, clamped_days)
+    configured_provider_ids = _collect_provider_ids(provider_manager, usage_store, clamped_days)
+    requested_provider_ids = {
+        normalize_provider_id(str(provider_id or ""))
+        for provider_id in (provider_ids or [])
+        if str(provider_id or "").strip()
+    }
+    provider_ids = [
+        provider_id
+        for provider_id in configured_provider_ids
+        if not requested_provider_ids or provider_id in requested_provider_ids
+    ]
     profiles = provider_manager._config.all_auth_profiles()
-    configured_providers = provider_manager._config.all_provider_configs()
     items: List[Dict[str, Any]] = []
 
     for provider_id in provider_ids:

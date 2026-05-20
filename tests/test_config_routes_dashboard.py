@@ -38,10 +38,7 @@ def client():
     from open_llm_auth.main import app
     from open_llm_auth.server.auth import verify_admin_token
     app.dependency_overrides[verify_admin_token] = _admin_principal
-    try:
-        yield TestClient(app)
-    finally:
-        app.dependency_overrides.pop(verify_admin_token, None)
+    return TestClient(app)
 
 
 def test_usage_summary(client):

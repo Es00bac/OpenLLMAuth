@@ -62,7 +62,8 @@ def _invert_tool_id_map(id_map: Dict[str, str]) -> Dict[str, str]:
 def _convert_content_to_anthropic(content: Any) -> List[Dict[str, Any]]:
     """Convert OpenAI message content to Anthropic content blocks."""
     if isinstance(content, str):
-        return [{"type": "text", "text": content}]
+        # Prevent empty text from causing 400 Bad Request
+        return [{"type": "text", "text": content if content else " "}]
 
     if isinstance(content, list):
         blocks: List[Dict[str, Any]] = []
@@ -178,6 +179,9 @@ def _convert_tool_choice(tool_choice: Any) -> Optional[Dict[str, Any]]:
 
 
 class AnthropicCompatibleProvider(BaseProvider):
+    def supports_reasoning_effort(self, *, model: Optional[str] = None) -> bool:
+        return True
+
     async def chat_completion(
         self,
         *,
@@ -207,8 +211,7 @@ class AnthropicCompatibleProvider(BaseProvider):
             if anthropic_tools:
                 body["tools"] = anthropic_tools
                 tc = _convert_tool_choice(tool_choice)
-                if tc:
-                    body["tool_choice"] = tc
+                body["tool_choice"] = tc or {"type": "auto"}
 
         body = compact_payload(body)
 
@@ -218,6 +221,9 @@ class AnthropicCompatibleProvider(BaseProvider):
                 json=body,
                 headers=self.headers,
             )
+            if response.status_code >= 400:
+                print(f"[open_llm_auth debug] {self.provider_id} request body: {json.dumps(body, indent=2)}")
+                print(f"[open_llm_auth debug] {self.provider_id} response: {response.status_code} {response.text}")
             response.raise_for_status()
             data = response.json()
 
@@ -272,8 +278,7 @@ class AnthropicCompatibleProvider(BaseProvider):
             if anthropic_tools:
                 body["tools"] = anthropic_tools
                 tc = _convert_tool_choice(tool_choice)
-                if tc:
-                    body["tool_choice"] = tc
+                body["tool_choice"] = tc or {"type": "auto"}
 
         body = compact_payload(body)
 
@@ -491,6 +496,16 @@ class AnthropicCompatibleProvider(BaseProvider):
 
         Returns (system_prompt, anthropic_messages).
         """
+        # Pre-scan to collect tool call IDs from assistant messages so we can drop
+        # orphaned tool results. Anthropic-compatible APIs (including Kimi) reject
+        # tool_result blocks whose tool_use_id does not match a prior tool_use.
+        seen_tool_call_ids: Set[str] = set()
+        for msg in messages:
+            if str(msg.get("role", "")).strip().lower() == "assistant":
+                for tc in msg.get("tool_calls") or []:
+                    if isinstance(tc, dict):
+                        seen_tool_call_ids.add(str(tc.get("id", "")))
+
         system_chunks: List[str] = []
         out: List[Dict[str, Any]] = []
         normalized_tool_id_map = tool_id_map if tool_id_map is not None else {}
@@ -509,12 +524,16 @@ class AnthropicCompatibleProvider(BaseProvider):
                 continue
 
             if role == "tool":
+                # Drop orphaned tool results that lack a matching assistant tool_call
+                original_id = str(tool_call_id or "")
+                if original_id and seen_tool_call_ids and original_id not in seen_tool_call_ids:
+                    continue
                 # Tool result: wrap in tool_result block in a user message
                 result_content = _extract_text_only(content)
                 if not result_content:
                     result_content = ""
                 normalized_id = _normalize_tool_id(
-                    str(tool_call_id or ""),
+                    original_id,
                     id_map=normalized_tool_id_map,
                     used_ids=used_tool_ids,
                 )
@@ -580,7 +599,7 @@ class AnthropicCompatibleProvider(BaseProvider):
 
             blocks = _convert_content_to_anthropic(content)
             if not blocks:
-                continue
+                blocks = [{"type": "text", "text": " "}]
 
             # Simplify to string when just one text block
             if len(blocks) == 1 and blocks[0]["type"] == "text":

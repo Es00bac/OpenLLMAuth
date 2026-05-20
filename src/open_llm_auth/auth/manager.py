@@ -37,12 +37,36 @@ from ..providers import (
     BedrockConverseProvider,
     ClaudeCliProvider,
     CodexCliProvider,
+    LocalEmbeddingProvider,
     MinimaxProvider,
     OpenAICodexProvider,
     OpenAIProvider,
     AgentBridgeProvider,
 )
 from ..server.egress_policy import validate_outbound_base_url
+
+
+def _run_async_refresh(coro: Any, *, timeout: float = 30.0) -> Any:
+    """Run an async credential refresh from sync provider-resolution code."""
+
+    import asyncio
+
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        return asyncio.run(coro)
+
+    import concurrent.futures
+
+    with concurrent.futures.ThreadPoolExecutor() as pool:
+        return pool.submit(asyncio.run, coro).result(timeout=timeout)
+
+
+def _strip_claude_code_context_suffix(model_ref: str) -> str:
+    value = str(model_ref or "").strip()
+    if value.lower().endswith("[1m]"):
+        return value[:-4].strip()
+    return value
 
 
 @dataclass
@@ -60,6 +84,21 @@ class ResolvedProvider:
     model_id: str
     profile_id: Optional[str]
     auth_source: str
+    attempts: List["ResolvedProviderAttempt"]
+    retry_status_codes: List[int]
+
+
+@dataclass
+class ResolvedProviderAttempt:
+    """One concrete provider/model/profile attempt in an ordered fallback chain."""
+
+    provider: BaseProvider
+    provider_id: str
+    model_id: str
+    profile_id: Optional[str]
+    auth_source: str
+    fallback_index: int = 0
+    fallback_reason: str = "primary"
 
 
 class ProviderManager:
@@ -71,6 +110,30 @@ class ProviderManager:
     here also enforces egress policy, profile ordering, env fallbacks, and some
     provider-specific OAuth refresh behavior.
     """
+    _LOCAL_EMBEDDING_MODEL_REF = "google/embeddinggemma-300m"
+    _OFFLINE_EMBEDDING_MODEL_REF = "local-fallback"
+    _LOCAL_EMBEDDING_PROVIDER_ID = "local-embeddings"
+    _LOCAL_EMBEDDING_MODEL_DEFINITIONS: Dict[str, Dict[str, Any]] = {
+        _LOCAL_EMBEDDING_MODEL_REF: {
+            "id": _LOCAL_EMBEDDING_MODEL_REF,
+            "name": "EmbeddingGemma 300M",
+            "type": "embedding",
+            "dimensions": 768,
+            "input": ["text"],
+            "owned_by": "opencas-local",
+            "local_runtime": "sentence_transformers",
+        },
+        _OFFLINE_EMBEDDING_MODEL_REF: {
+            "id": _OFFLINE_EMBEDDING_MODEL_REF,
+            "name": "Deterministic local hash fallback",
+            "type": "embedding",
+            "dimensions": 256,
+            "input": ["text"],
+            "owned_by": "opencas-local",
+            "local_runtime": "hash",
+        },
+    }
+
     def __init__(
         self,
         config_path: Optional[Path] = None,
@@ -85,17 +148,86 @@ class ProviderManager:
         )
 
     def reload(self) -> None:
-        self._config = load_config(
-            config_path=self._config_path,
-            env_path=self._env_path,
-        )
+        try:
+            self._config = load_config(
+                config_path=self._config_path,
+                env_path=self._env_path,
+            )
+        except TypeError:
+            # Some tests and embedding hosts monkeypatch load_config with the
+            # older no-argument signature. Keep ProviderManager tolerant while
+            # retaining the config/env-path-aware production path.
+            self._config = load_config()
 
     def resolve(
         self, model_ref: str, preferred_profile: Optional[str] = None
     ) -> ResolvedProvider:
         """Resolve a single model ref into the primary provider plus fallback chain."""
         self.reload()
-        ref = self._resolve_model_ref(model_ref, preferred_profile=preferred_profile)
+        normalized_model_ref = _strip_claude_code_context_suffix(model_ref)
+        ref = self._resolve_model_ref(normalized_model_ref, preferred_profile=preferred_profile)
+        resolved = self._resolve_provider_for_ref(ref)
+        fallback_refs = self._fallback_model_refs(
+            raw_model=normalized_model_ref,
+            primary_ref=ref,
+            operation="chat",
+        )
+        attempts = list(resolved.attempts)
+        for index, fallback_model_ref in enumerate(fallback_refs, start=1):
+            try:
+                fallback_ref = self._resolve_model_ref(
+                    fallback_model_ref,
+                    preferred_profile=None,
+                )
+                fallback = self._resolve_provider_for_ref(fallback_ref)
+            except ValueError:
+                logging.warning(
+                    "Skipping unresolved provider fallback '%s' for '%s'.",
+                    fallback_model_ref,
+                    model_ref,
+                )
+                continue
+            for attempt in fallback.attempts:
+                attempts.append(
+                    ResolvedProviderAttempt(
+                        provider=attempt.provider,
+                        provider_id=attempt.provider_id,
+                        model_id=attempt.model_id,
+                        profile_id=attempt.profile_id,
+                        auth_source=attempt.auth_source,
+                        fallback_index=index,
+                        fallback_reason=f"configured:{fallback_model_ref}",
+                    )
+                )
+        max_attempts = max(1, int(self._config.provider_fallback.max_attempts or 1))
+        deduped_attempts: List[ResolvedProviderAttempt] = []
+        seen_attempts: set[tuple[str, str, Optional[str], str]] = set()
+        for attempt in attempts:
+            key = (
+                normalize_provider_id(attempt.provider_id),
+                attempt.model_id,
+                attempt.profile_id,
+                attempt.auth_source,
+            )
+            if key in seen_attempts:
+                continue
+            seen_attempts.add(key)
+            deduped_attempts.append(attempt)
+            if len(deduped_attempts) >= max_attempts:
+                break
+        return resolved.__class__(
+            provider=resolved.provider,
+            providers=resolved.providers,
+            provider_id=resolved.provider_id,
+            model_id=resolved.model_id,
+            profile_id=resolved.profile_id,
+            auth_source=resolved.auth_source,
+            attempts=deduped_attempts,
+            retry_status_codes=list(self._config.provider_fallback.retry_status_codes),
+        )
+
+    def _resolve_provider_for_ref(self, ref: ResolvedModelRef) -> ResolvedProvider:
+        """Resolve a normalized model ref without expanding cross-provider fallbacks."""
         provider_cfg = self._resolve_provider_config(ref.provider_id)
         if not provider_cfg:
             raise ValueError(f"Provider '{ref.provider_id}' is not configured.")
@@ -140,6 +272,17 @@ class ProviderManager:
             if selected_profile_id is None and candidate_profile_id is not None:
                 selected_profile_id = candidate_profile_id
 
+        attempts = [
+            ResolvedProviderAttempt(
+                provider=provider,
+                provider_id=ref.provider_id,
+                model_id=ref.model_id,
+                profile_id=selected_profile_id,
+                auth_source=keys_info[min(index, len(keys_info) - 1)][1],
+            )
+            for index, provider in enumerate(providers_list)
+        ]
+
         return ResolvedProvider(
             provider=providers_list[0],
             providers=providers_list,
@@ -147,6 +290,8 @@ class ProviderManager:
             model_id=ref.model_id,
             profile_id=selected_profile_id,
             auth_source=keys_info[0][1],
+            attempts=attempts,
+            retry_status_codes=list(self._config.provider_fallback.retry_status_codes),
         )
 
     async def list_models(self) -> List[Dict[str, Any]]:
@@ -229,6 +374,183 @@ class ProviderManager:
 
         return sorted(out, key=lambda item: item["id"])
 
+    def available_model_refs(self, *, require_credentials: bool = True) -> List[str]:
+        """Return provider-prefixed model refs using this manager as authority.
+
+        This is the synchronous inventory path for host applications that need
+        to validate persisted model routing during startup without duplicating
+        OpenLLMAuth's model catalog or provider activation rules.
+        """
+
+        self.reload()
+        return self.model_refs_for_config(
+            self._config,
+            require_credentials=require_credentials,
+        )
+
+    @classmethod
+    def model_refs_for_config(
+        cls,
+        cfg: Config,
+        *,
+        require_credentials: bool = True,
+    ) -> List[str]:
+        """Return provider-prefixed model refs for an already-loaded config."""
+
+        manager = cls.__new__(cls)
+        manager._providers = {}
+        manager._config_path = None
+        manager._env_path = None
+        manager._config = cfg
+        return manager._available_model_refs_from_current_config(
+            require_credentials=require_credentials,
+        )
+
+    def model_definition(self, model_ref: str) -> Optional[Dict[str, Any]]:
+        """Return the authoritative model definition for a model ref, if known."""
+
+        self.reload()
+        return self._model_definition_from_current_config(model_ref)
+
+    def _model_definition_from_current_config(self, model_ref: str) -> Optional[Dict[str, Any]]:
+        """Return model metadata from the manager's current config without reloading."""
+
+        ref = self._resolve_model_ref(model_ref)
+        provider_cfg = self._resolve_provider_config(ref.provider_id)
+        if not provider_cfg:
+            return None
+        for model in list(getattr(provider_cfg, "models", []) or []):
+            if str(getattr(model, "id", "") or "").strip() != ref.model_id:
+                continue
+            dump = getattr(model, "model_dump", None)
+            if callable(dump):
+                return dict(dump(mode="json", by_alias=True))
+            return {
+                "id": getattr(model, "id", None),
+                "name": getattr(model, "name", None),
+                "contextWindow": getattr(model, "context_window", None),
+                "maxTokens": getattr(model, "max_tokens", None),
+            }
+        return None
+
+    @classmethod
+    def default_embedding_model_ref(cls) -> str:
+        """Return the gateway-owned default embedding model ref for host apps."""
+
+        configured = os.getenv("OPEN_LLM_AUTH_DEFAULT_EMBEDDING_MODEL", "").strip()
+        return configured or cls._LOCAL_EMBEDDING_MODEL_REF
+
+    @classmethod
+    def offline_embedding_model_ref(cls) -> str:
+        """Return the gateway-owned deterministic offline embedding fallback ref."""
+
+        return cls._OFFLINE_EMBEDDING_MODEL_REF
+
+    @classmethod
+    def local_embedding_model_refs(cls) -> List[str]:
+        """Return local embedding refs that route without network auth."""
+
+        refs = [cls.default_embedding_model_ref(), cls.offline_embedding_model_ref()]
+        return list(dict.fromkeys(refs))
+
+    @classmethod
+    def local_embedding_model_definition(cls, model_ref: str) -> Optional[Dict[str, Any]]:
+        """Return authoritative metadata for local embedding models."""
+
+        normalized = str(model_ref or "").strip()
+        if normalized in cls._LOCAL_EMBEDDING_MODEL_DEFINITIONS:
+            return dict(cls._LOCAL_EMBEDDING_MODEL_DEFINITIONS[normalized])
+        return None
+
+    def embedding_model_definition(self, model_ref: str) -> Optional[Dict[str, Any]]:
+        """Return authoritative metadata for an embedding model ref."""
+
+        local = self.local_embedding_model_definition(model_ref)
+        if local is not None:
+            return local
+        definition = self._model_definition_from_current_config(model_ref)
+        if not definition:
+            return None
+        model_id = str(definition.get("id") or model_ref)
+        name = str(definition.get("name") or model_id)
+        if "embedding" not in f"{model_id} {name}".lower():
+            return None
+        out = dict(definition)
+        if out.get("dimensions") is None and out.get("maxTokens") is not None:
+            out["dimensions"] = out.get("maxTokens")
+        out.setdefault("type", "embedding")
+        return out
+
+    def embedding_model_refs(self, *, require_credentials: bool = True) -> List[str]:
+        """Return gateway-authoritative embedding refs, including local fallbacks."""
+
+        refs = list(self.local_embedding_model_refs())
+        for ref in self.available_model_refs(require_credentials=require_credentials):
+            definition = self.embedding_model_definition(ref)
+            if definition is not None:
+                refs.append(ref)
+        return sorted(dict.fromkeys(refs))
+
+    @classmethod
+    def embedding_model_refs_for_config(
+        cls,
+        cfg: Config,
+        *,
+        require_credentials: bool = True,
+    ) -> List[str]:
+        """Return embedding refs for an already-loaded config."""
+
+        manager = cls.__new__(cls)
+        manager._providers = {}
+        manager._config_path = None
+        manager._env_path = None
+        manager._config = cfg
+        refs = list(cls.local_embedding_model_refs())
+        for ref in manager._available_model_refs_from_current_config(
+            require_credentials=require_credentials,
+        ):
+            definition = manager.embedding_model_definition(ref)
+            if definition is not None:
+                refs.append(ref)
+        return sorted(dict.fromkeys(refs))
+
+    def _available_model_refs_from_current_config(
+        self,
+        *,
+        require_credentials: bool,
+    ) -> List[str]:
+        out: List[str] = []
+        seen: set[str] = set()
+        for provider_id in self._all_provider_ids():
+            provider_cfg = self._resolve_provider_config(provider_id)
+            if not provider_cfg:
+                continue
+            if require_credentials:
+                try:
+                    if not self._resolve_api_keys(
+                        provider_id=provider_id,
+                        provider_cfg=provider_cfg,
+                        preferred_profile=None,
+                    ):
+                        continue
+                except ValueError:
+                    continue
+            for model in list(getattr(provider_cfg, "models", []) or []):
+                model_id = str(getattr(model, "id", "") or "").strip()
+                if not model_id:
+                    continue
+                ref = f"{provider_id}/{model_id}"
+                if ref in seen:
+                    continue
+                seen.add(ref)
+                out.append(ref)
+                if provider_id in {"codex-cli", "openai-codex"} and model_id.lower().startswith("gpt-"):
+                    canonical_ref = f"openai/{model_id}"
+                    if canonical_ref not in seen:
+                        seen.add(canonical_ref)
+                        out.append(canonical_ref)
+        return out
+
     @staticmethod
     def _should_discover_models(
         provider_id: str, models: List[ModelDefinitionConfig]
@@ -275,7 +597,11 @@ class ProviderManager:
             "claude-cli",
             "codex-cli",
         }
-        return sorted(configured | builtin)
+        provider_ids = configured | builtin
+        active_provider_ids = self._config.active_provider_id_set()
+        if active_provider_ids:
+            provider_ids &= active_provider_ids
+        return sorted(provider_ids)
 
     def _resolve_model_ref(
         self,
@@ -283,13 +609,20 @@ class ProviderManager:
         preferred_profile: Optional[str] = None,
     ) -> ResolvedModelRef:
         """Normalize user-facing model strings into `(provider, model, profile)`."""
-        model = (raw_model or "").strip()
+        model = _strip_claude_code_context_suffix(raw_model)
         if not model:
             if self._config.default_model:
                 return self._resolve_model_ref(
                     self._config.default_model, preferred_profile
                 )
             raise ValueError("Model is required.")
+
+        if model in self._LOCAL_EMBEDDING_MODEL_DEFINITIONS:
+            return ResolvedModelRef(
+                provider_id=self._LOCAL_EMBEDDING_PROVIDER_ID,
+                model_id=model,
+                profile_id=None,
+            )
 
         if "/" in model:
             provider_segment, model_id = model.split("/", 1)
@@ -312,6 +645,14 @@ class ProviderManager:
             else:
                 provider = normalize_provider_id(provider_segment)
 
+            codex_ref = self._canonical_openai_codex_ref(
+                provider_id=provider,
+                model_id=model_id,
+                preferred_profile=profile_id,
+            )
+            if codex_ref is not None:
+                return codex_ref
+
             return ResolvedModelRef(
                 provider_id=provider, model_id=model_id, profile_id=profile_id
             )
@@ -333,6 +674,94 @@ class ProviderManager:
             f"Model '{model}' does not include a provider prefix and could not be inferred. "
             "Use 'provider/model'."
         )
+
+    def _canonical_openai_codex_ref(
+        self,
+        *,
+        provider_id: str,
+        model_id: str,
+        preferred_profile: Optional[str],
+    ) -> Optional[ResolvedModelRef]:
+        """Map canonical OpenAI GPT refs to subscription-backed Codex routes.
+
+        OpenAI API-key auth remains authoritative when it is configured. If it
+        is not usable, ChatGPT/Codex subscription auth can satisfy
+        ``openai/gpt-*`` through the OpenAI Codex OAuth transport first, then the
+        native Codex CLI fallback. This mirrors OpenClaw's split between the
+        canonical OpenAI model ref and the underlying subscription auth route.
+        """
+
+        provider = normalize_provider_id(provider_id)
+        if provider != "openai" or not model_id.strip().lower().startswith("gpt-"):
+            return None
+        if self._provider_has_usable_credentials(
+            "openai",
+            preferred_profile=preferred_profile,
+        ):
+            return None
+        for codex_provider in ("openai-codex", "codex-cli"):
+            if self._provider_has_usable_credentials(codex_provider, preferred_profile=None):
+                return ResolvedModelRef(
+                    provider_id=codex_provider,
+                    model_id=model_id,
+                    profile_id=None,
+                )
+        return None
+
+    def _provider_has_usable_credentials(
+        self,
+        provider_id: str,
+        *,
+        preferred_profile: Optional[str],
+    ) -> bool:
+        active_provider_ids = self._config.active_provider_id_set()
+        normalized_provider = normalize_provider_id(provider_id)
+        if active_provider_ids and normalized_provider not in active_provider_ids:
+            return False
+        provider_cfg = self._resolve_provider_config(provider_id)
+        if not provider_cfg:
+            return False
+        try:
+            return bool(
+                self._resolve_api_keys(
+                    provider_id=provider_id,
+                    provider_cfg=provider_cfg,
+                    preferred_profile=preferred_profile,
+                )
+            )
+        except ValueError:
+            return False
+
+    def _fallback_model_refs(
+        self,
+        *,
+        raw_model: str,
+        primary_ref: ResolvedModelRef,
+        operation: str,
+    ) -> List[str]:
+        """Return configured cross-provider fallback refs for a primary ref."""
+        config = self._config.provider_fallback
+        if not config.enabled:
+            return []
+        provider_model = f"{primary_ref.provider_id}/{primary_ref.model_id}"
+        keys = [
+            f"{operation}:{provider_model}",
+            f"{operation}:{primary_ref.provider_id}",
+            provider_model,
+            primary_ref.provider_id,
+            raw_model.strip(),
+        ]
+        out: List[str] = []
+        for key in keys:
+            values = config.order.get(key)
+            if not values:
+                continue
+            for item in values:
+                model_ref = str(item or "").strip()
+                if not model_ref or model_ref == provider_model or model_ref in out:
+                    continue
+                out.append(model_ref)
+        return out
 
     def _infer_provider_for_model_id(self, model_id: str) -> Optional[str]:
         normalized_model = model_id.strip().lower()
@@ -365,6 +794,13 @@ class ProviderManager:
     def _resolve_provider_config(self, provider_id: str) -> Optional[ProviderConfig]:
         """Merge builtin catalog data with local config for runtime use."""
         provider = normalize_provider_id(provider_id)
+
+        if provider == self._LOCAL_EMBEDDING_PROVIDER_ID:
+            models = [
+                ModelDefinitionConfig.model_validate(definition)
+                for definition in self._LOCAL_EMBEDDING_MODEL_DEFINITIONS.values()
+            ]
+            return ProviderConfig(baseUrl="", authHeader=False, models=models)
 
         builtin_raw = get_builtin_provider_config(provider)
         builtin_cfg = (
@@ -484,6 +920,9 @@ class ProviderManager:
     ) -> List[Tuple[Optional[str], str, str]]:
         """Resolve credentials in retry/fallback order for a logical provider."""
         provider = normalize_provider_id(provider_id)
+        if provider == self._LOCAL_EMBEDDING_PROVIDER_ID:
+            return [(None, "local-embedding:self-contained", "cli")]
+
         auth_mode = provider_cfg.auth or (
             "aws-sdk" if provider == "amazon-bedrock" else "api-key"
         )
@@ -603,19 +1042,9 @@ class ProviderManager:
 
         if provider == "openai-codex":
             try:
-                import asyncio
                 from .oauth_refresh import refresh_openai_codex_token
 
-                loop = asyncio.get_event_loop()
-                if loop.is_running():
-                    import concurrent.futures
-
-                    with concurrent.futures.ThreadPoolExecutor() as pool:
-                        refreshed = pool.submit(
-                            asyncio.run, refresh_openai_codex_token(profile.refresh)
-                        ).result(timeout=30)
-                else:
-                    refreshed = asyncio.run(refresh_openai_codex_token(profile.refresh))
+                refreshed = _run_async_refresh(refresh_openai_codex_token(profile.refresh))
 
                 profile.access = refreshed.access
                 profile.refresh = refreshed.refresh
@@ -656,20 +1085,11 @@ class ProviderManager:
     ) -> Optional[AuthProfile]:
         """Generic OAuth token refresh using a function from the auth module."""
         try:
-            import asyncio
             import importlib
             mod = importlib.import_module(f".{module_name}", package="open_llm_auth.auth")
             refresh_fn = getattr(mod, func_name)
 
-            loop = asyncio.get_event_loop()
-            if loop.is_running():
-                import concurrent.futures
-                with concurrent.futures.ThreadPoolExecutor() as pool:
-                    refreshed = pool.submit(
-                        asyncio.run, refresh_fn(profile.refresh)
-                    ).result(timeout=30)
-            else:
-                refreshed = asyncio.run(refresh_fn(profile.refresh))
+            refreshed = _run_async_refresh(refresh_fn(profile.refresh))
 
             profile.access = refreshed.access
             profile.refresh = refreshed.refresh
@@ -959,18 +1379,9 @@ class ProviderManager:
         if not github_token:
             return None
         try:
-            import asyncio
             from ._github_copilot_auth import exchange_github_token_for_copilot
 
-            loop = asyncio.get_event_loop()
-            if loop.is_running():
-                import concurrent.futures
-                with concurrent.futures.ThreadPoolExecutor() as pool:
-                    result = pool.submit(
-                        asyncio.run, exchange_github_token_for_copilot(github_token)
-                    ).result(timeout=30)
-            else:
-                result = asyncio.run(exchange_github_token_for_copilot(github_token))
+            result = _run_async_refresh(exchange_github_token_for_copilot(github_token))
 
             profile.access = result.copilot_token
             profile.expires = result.expires_at
@@ -1129,6 +1540,12 @@ class ProviderManager:
         )
 
         # CLI providers don't need a base URL
+        if provider_id == self._LOCAL_EMBEDDING_PROVIDER_ID:
+            return LocalEmbeddingProvider(
+                provider_id=self._LOCAL_EMBEDDING_PROVIDER_ID,
+                model_definitions=self._LOCAL_EMBEDDING_MODEL_DEFINITIONS,
+            )
+
         if not base_url and provider_id not in {"claude-cli", "codex-cli"}:
             raise ValueError(f"Provider '{provider_id}' has no baseUrl configured.")
 

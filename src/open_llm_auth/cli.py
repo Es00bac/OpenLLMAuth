@@ -9,7 +9,7 @@ import typer
 import uvicorn
 
 from .auth.manager import ProviderManager
-from .config import AuthProfile, load_config
+from .config import AuthProfile, Config, load_config
 
 
 app = typer.Typer(help="Open LLM Auth CLI")
@@ -26,6 +26,14 @@ def _mask_secret(value: Optional[str]) -> str:
     if len(value) <= 8:
         return "*" * len(value)
     return f"{value[:4]}...{value[-4:]}"
+
+
+def _ensure_active_provider(cfg: Config, provider_id: str) -> None:
+    """Activate a provider when a login command creates usable credentials."""
+
+    provider = provider_id.strip()
+    if provider and provider not in cfg.active_provider_ids:
+        cfg.active_provider_ids.append(provider)
 
 
 @app.command()
@@ -133,6 +141,7 @@ def login_openai_codex(
         cfg.auth_order.setdefault("openai-codex", [])
         if profile_id not in cfg.auth_order["openai-codex"]:
             cfg.auth_order["openai-codex"].insert(0, profile_id)
+        _ensure_active_provider(cfg, "openai-codex")
         cfg.save()
         typer.echo(f"Saved OAuth profile {profile_id}")
         if creds.get("account_id"):

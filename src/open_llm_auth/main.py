@@ -8,7 +8,7 @@ This module only wires those routers together and serves the lightweight static
 UI entrypoints (`/`, `/chat`, `/config`).
 """
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Response
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -16,6 +16,7 @@ from pathlib import Path
 
 from .server.routes import router as api_router
 from .server.config_routes import router as config_router
+from .server.anthropic_routes import router as anthropic_router
 
 app = FastAPI(
     title="Open LLM Auth",
@@ -24,6 +25,7 @@ app = FastAPI(
 
 # API routes: chat/models plus the universal task surface.
 app.include_router(api_router)
+app.include_router(anthropic_router)
 app.include_router(config_router)
 
 # Static files back the lightweight config/chat GUIs.
@@ -51,6 +53,12 @@ def root(request: Request):
     if index_file.exists():
         return FileResponse(str(index_file))
     return {"message": "Open LLM Auth API", "docs": "/docs", "gui": "/config"}
+
+
+@app.head("/")
+def root_head():
+    """Claude Code probes the base URL with HEAD; respond cleanly."""
+    return Response(status_code=200)
 
 
 @app.get("/chat")

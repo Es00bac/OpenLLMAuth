@@ -210,3 +210,39 @@ def test_try_refresh_oauth_allows_anthropic_without_refresh_token(
 
     assert refreshed is profile
     assert called["value"] is True
+
+
+def test_try_refresh_openai_codex_oauth_without_current_event_loop(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from types import SimpleNamespace
+    from open_llm_auth.auth import oauth_refresh
+
+    monkeypatch.setattr(Config, "save", lambda self: None)
+    manager = ProviderManager()
+    profile = AuthProfile(
+        provider="openai-codex",
+        type="oauth",
+        access="old-access",
+        refresh="old-refresh",
+        expires=1,
+    )
+
+    async def _fake_refresh(refresh: str):
+        assert refresh == "old-refresh"
+        return SimpleNamespace(
+            access="new-access",
+            refresh="new-refresh",
+            expires=4102444800000,
+            account_id="acct-1",
+        )
+
+    monkeypatch.setattr(oauth_refresh, "refresh_openai_codex_token", _fake_refresh)
+
+    refreshed = manager._try_refresh_oauth("openai-codex:test", profile)
+
+    assert refreshed is profile
+    assert profile.access == "new-access"
+    assert profile.refresh == "new-refresh"
+    assert profile.expires == 4102444800000
+    assert profile.account_id == "acct-1"

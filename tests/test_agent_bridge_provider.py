@@ -28,7 +28,7 @@ async def test_mutating_calls_send_contract_headers() -> None:
     provider._post_json = _fake_post  # type: ignore[method-assign]
 
     await provider.run_task({"objective": "x"})
-    await provider.retry_task("task-1", operator="operator")
+    await provider.retry_task("task-1", operator="jarrod")
     await provider.approve_task("task-1", "approval-1", True)
     await provider.cancel_task("task-1")
 
@@ -80,14 +80,14 @@ async def test_chat_completion_forwards_bounded_context_into_system_prompt(monke
             {"role": "assistant", "content": "Yes, task streaming was shallow."},
             {"role": "user", "content": [{"type": "text", "text": "Please finish T8."}]},
         ],
-        payload={"temperature": 0.25, "authProfile": "operator"},
+        payload={"temperature": 0.25, "authProfile": "jarrod"},
     )
 
     assert response["choices"][0]["message"]["content"] == "context preserved"
     assert seen["url"] == "http://127.0.0.1:1/chat"
     assert seen["json"]["message"] == "Please finish T8."
     assert seen["json"]["temperature"] == 0.25
-    assert seen["json"]["authProfile"] == "operator"
+    assert seen["json"]["authProfile"] == "jarrod"
     assert seen["json"]["modelProfile"] == "kimi-coding/k2p5"
     assert "Stay terse." in seen["json"]["system"]
     assert "Gateway conversation context:" in seen["json"]["system"]

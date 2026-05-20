@@ -70,6 +70,10 @@ class BaseProvider(ABC):
             "note": "Provider telemetry is not implemented for this adapter.",
         }
 
+    def supports_reasoning_effort(self, *, model: Optional[str] = None) -> bool:
+        """Return whether this provider honors ``reasoning_effort`` payload hints."""
+        return False
+
     def attach_response_telemetry(
         self,
         payload: Dict[str, Any],

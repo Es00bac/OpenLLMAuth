@@ -58,7 +58,7 @@ async def refresh_openai_codex_token(refresh_token: str) -> RefreshedCredentials
 
         if response.status_code != 200:
             log.error("OpenAI Codex token refresh failed: %s %s", response.status_code, response.text)
-            raise ValueError(f"Token refresh failed: HTTP {response.status_code}")
+            raise ValueError(_openai_codex_refresh_error_message(response))
 
         data = response.json()
         access_token = data.get("access_token")
@@ -78,6 +78,30 @@ async def refresh_openai_codex_token(refresh_token: str) -> RefreshedCredentials
             expires=expires_ms,
             account_id=account_id,
         )
+
+
+def _openai_codex_refresh_error_message(response: httpx.Response) -> str:
+    """Return a repair-oriented error for OpenAI Codex OAuth refresh failures."""
+
+    status = response.status_code
+    code = ""
+    message = ""
+    try:
+        payload = response.json()
+    except Exception:
+        payload = None
+    if isinstance(payload, dict):
+        error = payload.get("error")
+        if isinstance(error, dict):
+            code = str(error.get("code") or "").strip()
+            message = str(error.get("message") or "").strip()
+    detail = f"{code}: {message}".strip(": ").strip()
+    if code == "refresh_token_reused":
+        repair = "sign in again or import a fresh OpenAI Codex OAuth profile"
+        return f"Token refresh failed: HTTP {status} ({detail}; {repair})"
+    if detail:
+        return f"Token refresh failed: HTTP {status} ({detail})"
+    return f"Token refresh failed: HTTP {status}"
 
 
 # Qwen Portal OAuth constants

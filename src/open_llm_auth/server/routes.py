@@ -18,10 +18,10 @@ import httpx
 from fastapi import APIRouter, Depends, Header, HTTPException
 from fastapi.responses import JSONResponse, StreamingResponse
 
-from ..auth.manager import ProviderManager, ResolvedProvider
+from ..auth.manager import ProviderManager, ResolvedProvider, ResolvedProviderAttempt
 from ..config import load_config
 from ..providers import AgentBridgeProvider
-from .auth import Principal, require_scopes, verify_server_token
+from .auth import Principal, require_scopes, verify_server_token, verify_server_token_or_x_api_key
 from .durable_state import (
     DurableIdempotencyToken,
     DurableControlStateStore,
@@ -508,11 +508,11 @@ def _record_usage(
         meta_payload = dict(meta or {})
         meta_payload.setdefault("auth_source", resolved.auth_source)
         get_usage_store().record(
-            provider=resolved.provider_id,
-            model=resolved.model_id,
+            provider=str(meta_payload.get("provider") or resolved.provider_id),
+            model=str(meta_payload.get("model") or resolved.model_id),
             endpoint=endpoint,
             source=source,
-            profile_id=resolved.profile_id,
+            profile_id=meta_payload.get("profile_id") or resolved.profile_id,
             prompt_tokens=prompt_tokens,
             completion_tokens=completion_tokens,
             total_tokens=total_tokens,
@@ -522,6 +522,69 @@ def _record_usage(
         )
     except Exception:
         logging.debug("Failed to record usage", exc_info=True)
+
+
+def _resolved_attempts(resolved: ResolvedProvider) -> List[ResolvedProviderAttempt]:
+    attempts = list(getattr(resolved, "attempts", []) or [])
+    if attempts:
+        return attempts
+    return [
+        ResolvedProviderAttempt(
+            provider=provider,
+            provider_id=resolved.provider_id,
+            model_id=resolved.model_id,
+            profile_id=getattr(resolved, "profile_id", None),
+            auth_source=getattr(resolved, "auth_source", "unknown"),
+        )
+        for provider in getattr(resolved, "providers", [resolved.provider])
+    ]
+
+
+def _retryable_status(resolved: ResolvedProvider, status_code: int) -> bool:
+    retry_codes = set(getattr(resolved, "retry_status_codes", None) or [429])
+    return int(status_code) in retry_codes
+
+
+def _fallback_meta(
+    *,
+    resolved: ResolvedProvider,
+    active: ResolvedProviderAttempt,
+    failed_attempts: List[Dict[str, Any]],
+) -> Dict[str, Any]:
+    attempts = _resolved_attempts(resolved)
+    return {
+        "provider": active.provider_id,
+        "model": active.model_id,
+        "profile_id": active.profile_id,
+        "auth_source": active.auth_source,
+        "fallback_active": active.fallback_index > 0 or bool(failed_attempts),
+        "fallback_attempt_count": len(failed_attempts) + 1,
+        "fallback_failed_attempts": failed_attempts,
+        "fallback_chain": [
+            {
+                "provider": attempt.provider_id,
+                "model": attempt.model_id,
+                "profile_id": attempt.profile_id,
+                "fallback_index": attempt.fallback_index,
+                "reason": attempt.fallback_reason,
+            }
+            for attempt in attempts
+        ],
+    }
+
+
+def _attach_fallback_meta(
+    response_data: Dict[str, Any],
+    *,
+    resolved: ResolvedProvider,
+    active: ResolvedProviderAttempt,
+    failed_attempts: List[Dict[str, Any]],
+) -> Dict[str, Any]:
+    if isinstance(response_data, dict):
+        meta = dict(response_data.get("_open_llm_auth") or {})
+        meta.update(_fallback_meta(resolved=resolved, active=active, failed_attempts=failed_attempts))
+        response_data["_open_llm_auth"] = meta
+    return response_data
 
 
 def _resolve_agent_bridge_provider(
@@ -644,13 +707,14 @@ async def _execute_stream_with_fallbacks(
     resolved: ResolvedProvider,
     messages_dump: List[Dict[str, Any]],
     payload: Dict[str, Any],
-) -> tuple[AsyncIterator[bytes], str]:
+) -> tuple[AsyncIterator[bytes], Dict[str, Any]]:
     last_exc: Optional[httpx.HTTPStatusError] = None
+    failed_attempts: List[Dict[str, Any]] = []
 
-    for provider in resolved.providers:
+    for attempt in _resolved_attempts(resolved):
         try:
-            stream_iter = await provider.chat_completion_stream(
-                model=resolved.model_id,
+            stream_iter = await attempt.provider.chat_completion_stream(
+                model=attempt.model_id,
                 messages=messages_dump,
                 payload=payload,
             )
@@ -664,21 +728,38 @@ async def _execute_stream_with_fallbacks(
                     if False:
                         yield b""
 
-                return _empty(), provider.provider_id
+                return _empty(), _fallback_meta(
+                    resolved=resolved,
+                    active=attempt,
+                    failed_attempts=failed_attempts,
+                )
 
             async def _resume() -> AsyncIterator[bytes]:
                 yield first_chunk
                 async for chunk in aiter:
                     yield chunk
 
-            return _resume(), provider.provider_id
+            return _resume(), _fallback_meta(
+                resolved=resolved,
+                active=attempt,
+                failed_attempts=failed_attempts,
+            )
         except httpx.HTTPStatusError as exc:
-            if exc.response.status_code == 429:
+            if _retryable_status(resolved, exc.response.status_code):
                 logging.warning(
-                    "Provider %s rate limited on stream, trying next fallback key.",
-                    resolved.provider_id,
+                    "Provider %s/%s returned HTTP %s on stream, trying fallback.",
+                    attempt.provider_id,
+                    attempt.model_id,
+                    exc.response.status_code,
                 )
                 last_exc = exc
+                failed_attempts.append(
+                    {
+                        "provider": attempt.provider_id,
+                        "model": attempt.model_id,
+                        "status_code": exc.response.status_code,
+                    }
+                )
                 continue
             raise
 
@@ -694,21 +775,37 @@ async def _execute_non_stream_with_fallbacks(
     payload: Dict[str, Any],
 ) -> Dict[str, Any]:
     last_exc: Optional[httpx.HTTPStatusError] = None
+    failed_attempts: List[Dict[str, Any]] = []
 
-    for provider in resolved.providers:
+    for attempt in _resolved_attempts(resolved):
         try:
-            return await provider.chat_completion(
-                model=resolved.model_id,
+            response = await attempt.provider.chat_completion(
+                model=attempt.model_id,
                 messages=messages_dump,
                 payload=payload,
             )
+            return _attach_fallback_meta(
+                response,
+                resolved=resolved,
+                active=attempt,
+                failed_attempts=failed_attempts,
+            )
         except httpx.HTTPStatusError as exc:
-            if exc.response.status_code == 429:
+            if _retryable_status(resolved, exc.response.status_code):
                 logging.warning(
-                    "Provider %s rate limited, trying next fallback key.",
-                    resolved.provider_id,
+                    "Provider %s/%s returned HTTP %s, trying fallback.",
+                    attempt.provider_id,
+                    attempt.model_id,
+                    exc.response.status_code,
                 )
                 last_exc = exc
+                failed_attempts.append(
+                    {
+                        "provider": attempt.provider_id,
+                        "model": attempt.model_id,
+                        "status_code": exc.response.status_code,
+                    }
+                )
                 continue
             raise
 
@@ -724,21 +821,37 @@ async def _execute_embeddings_with_fallbacks(
     payload: Dict[str, Any],
 ) -> Dict[str, Any]:
     last_exc: Optional[httpx.HTTPStatusError] = None
+    failed_attempts: List[Dict[str, Any]] = []
 
-    for provider in resolved.providers:
+    for attempt in _resolved_attempts(resolved):
         try:
-            return await provider.embeddings(
-                model=resolved.model_id,
+            response = await attempt.provider.embeddings(
+                model=attempt.model_id,
                 input_texts=input_texts,
                 payload=payload,
             )
+            return _attach_fallback_meta(
+                response,
+                resolved=resolved,
+                active=attempt,
+                failed_attempts=failed_attempts,
+            )
         except httpx.HTTPStatusError as exc:
-            if exc.response.status_code == 429:
+            if _retryable_status(resolved, exc.response.status_code):
                 logging.warning(
-                    "Provider %s rate limited on embeddings, trying next fallback key.",
-                    resolved.provider_id,
+                    "Provider %s/%s returned HTTP %s on embeddings, trying fallback.",
+                    attempt.provider_id,
+                    attempt.model_id,
+                    exc.response.status_code,
                 )
                 last_exc = exc
+                failed_attempts.append(
+                    {
+                        "provider": attempt.provider_id,
+                        "model": attempt.model_id,
+                        "status_code": exc.response.status_code,
+                    }
+                )
                 continue
             raise
 
@@ -792,22 +905,24 @@ async def universal_completions(
 
     if request.stream:
         try:
-            stream_iter, active_provider_id = await _execute_stream_with_fallbacks(
+            stream_iter, telemetry_meta = await _execute_stream_with_fallbacks(
                 resolved=resolved,
                 messages_dump=messages_dump,
                 payload=payload,
             )
+            active_provider_id = str(telemetry_meta.get("provider") or resolved.provider_id)
             _record_usage(
                 resolved=resolved,
                 endpoint="universal.stream",
                 source="universal",
                 prompt_tokens=estimated_prompt_tokens,
+                meta=telemetry_meta,
             )
             return StreamingResponse(
                 _wrap_universal_stream(
                     stream_iter,
                     provider_id=active_provider_id,
-                    model_id=resolved.model_id,
+                    model_id=str(telemetry_meta.get("model") or resolved.model_id),
                 ),
                 media_type="text/event-stream",
                 headers={
@@ -861,10 +976,15 @@ async def universal_completions(
         )
         return {
             "object": "universal.response",
-            "provider": resolved.provider_id,
-            "model": resolved.model_id,
-            "profile": resolved.profile_id,
-            "auth_source": resolved.auth_source,
+            "provider": telemetry_meta.get("provider") or resolved.provider_id,
+            "model": telemetry_meta.get("model") or resolved.model_id,
+            "profile": telemetry_meta.get("profile_id") or resolved.profile_id,
+            "auth_source": telemetry_meta.get("auth_source") or resolved.auth_source,
+            "fallback": {
+                "active": telemetry_meta.get("fallback_active", False),
+                "attempt_count": telemetry_meta.get("fallback_attempt_count", 1),
+                "failed_attempts": telemetry_meta.get("fallback_failed_attempts", []),
+            },
             "output_text": _extract_primary_text(provider_response),
             "response": provider_response,
         }
@@ -1937,16 +2057,18 @@ async def chat_completions(
 
     if payload.get("stream"):
         try:
-            stream_iter, active_provider_id = await _execute_stream_with_fallbacks(
+            stream_iter, telemetry_meta = await _execute_stream_with_fallbacks(
                 resolved=resolved,
                 messages_dump=messages_dump,
                 payload=payload,
             )
+            active_provider_id = str(telemetry_meta.get("provider") or resolved.provider_id)
             _record_usage(
                 resolved=resolved,
                 endpoint="chat.completions.stream",
                 source="openai_compat",
                 prompt_tokens=estimated_prompt_tokens,
+                meta=telemetry_meta,
             )
             return StreamingResponse(
                 _wrap_sse_stream(stream_iter, provider_id=active_provider_id),
@@ -2118,7 +2240,7 @@ async def embeddings(
 
 
 @router.get("/models", response_model=ModelList)
-async def list_models(principal: Principal = Depends(verify_server_token)) -> ModelList:
+async def list_models(principal: Principal = Depends(verify_server_token_or_x_api_key)) -> ModelList:
     denied = _enforce_scope(principal, "read")
     if denied is not None:
         return _json_response(status_code=403, content=denied)

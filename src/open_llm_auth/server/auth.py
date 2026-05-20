@@ -134,6 +134,23 @@ def verify_server_token(authorization: Optional[str] = Header(default=None)) -> 
     raise HTTPException(status_code=401, detail="Invalid server token")
 
 
+def verify_server_token_or_x_api_key(
+    authorization: Optional[str] = Header(default=None),
+    x_api_key: Optional[str] = Header(default=None, alias="x-api-key"),
+) -> Principal:
+    """Authenticate OpenAI-style bearer callers and Anthropic SDK callers.
+
+    Claude Code uses Anthropic's `x-api-key` convention for gateway requests,
+    including `/v1/models`. Internally the gateway still validates that value
+    against the same configured server-token machinery.
+    """
+    if authorization:
+        return verify_server_token(authorization=authorization)
+    if x_api_key:
+        return verify_server_token(authorization=f"Bearer {x_api_key}")
+    return verify_server_token(authorization=None)
+
+
 def verify_admin_token(authorization: Optional[str] = Header(default=None)) -> Principal:
     """Authenticate and then require admin scope for config-mutating surfaces."""
     principal = verify_server_token(authorization=authorization)
